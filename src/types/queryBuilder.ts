@@ -89,7 +89,24 @@ export interface QueryBuilderOptions {
      * another data source rather than one opened from a panel, the history or a shared link.
      */
     datasourceUid?: string;
+
+    /**
+     * Tables resolved from the `clickhouse_link_*_table` dashboard variables, carried on
+     * data-link queries so links built from them in Explore, where the variables do not
+     * exist, keep pointing at the same tables.
+     */
+    linkTables?: LinkTables;
   };
+}
+
+export interface LinkTable {
+  database: string;
+  table: string;
+}
+
+export interface LinkTables {
+  traces?: LinkTable;
+  logs?: LinkTable;
 }
 
 export enum AggregateType {

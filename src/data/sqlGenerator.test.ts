@@ -248,7 +248,7 @@ describe('SQL Generator', () => {
     const expectedSqlParts = [
       'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
       'FROM "otel"."otel_logs"',
-      'WHERE ( timestamp >= $__fromTime AND timestamp <= $__toTime )',
+      'WHERE ( timestamp >= $__fromTime_ms AND timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )',
       'ORDER BY timestamp DESC LIMIT 1000',
     ];
 
@@ -290,17 +290,47 @@ describe('SQL Generator', () => {
       ],
     };
 
-    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause and grouped with
-    // the Time column's alias ("timestamp") in the ORDER BY.
+    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause, which keeps partition and
+    // primary key pruning. The Time column adds a millisecond bound so a logs page that starts inside a busy
+    // second makes progress. Both are grouped in the ORDER BY via the Time column's alias ("timestamp").
     const expectedSqlParts = [
       'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
       'FROM "otel"."otel_logs"',
       'WHERE ( TimestampTime >= $__fromTime AND TimestampTime <= $__toTime )',
+      'AND ( timestamp >= $__fromTime_ms AND timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )',
       'ORDER BY (TimestampTime, timestamp) DESC LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('does not add a millisecond bound when the logs time column is only second precision', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.FilterTime },
+        { name: 'Timestamp', type: 'DateTime', hint: ColumnHint.Time },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          type: 'datetime',
+          key: '',
+          condition: 'AND',
+          hint: ColumnHint.FilterTime,
+          operator: FilterOperator.WithInGrafanaTimeRange,
+        },
+      ],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toContain('TimestampTime >= $__fromTime AND TimestampTime <= $__toTime');
+    expect(sql).not.toContain('_ms');
   });
 
   it('generates simple time series query', () => {
@@ -366,6 +396,30 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it.each([
+    ['DateTime', '$__timeInterval'],
+    ['Nullable(DateTime)', '$__timeInterval'],
+    ["DateTime('UTC')", '$__timeInterval'],
+    ['Date', '$__timeInterval'],
+    [undefined, '$__timeInterval'],
+    ['DateTime64(3)', '$__timeInterval_ms'],
+    ["DateTime64(9, 'UTC')", '$__timeInterval_ms'],
+    ['Nullable(DateTime64(6))', '$__timeInterval_ms'],
+    ['LowCardinality(Nullable(DateTime64(3)))', '$__timeInterval_ms'],
+  ])('buckets a %s time column in aggregate time series mode with %s', (type, macro) => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'time_data',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      columns: [{ name: 'ts', type, hint: ColumnHint.Time }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'n' }],
+    };
+    expect(generateSql(opts)).toEqual(
+      `SELECT ${macro}(ts) as "time", count(*) as n FROM "default"."time_data" GROUP BY time`
+    );
   });
 
   it('generates trace ID query without OTel enabled', () => {
@@ -1340,6 +1394,48 @@ describe('getFilters', () => {
     const sql = _testExports.getFilters(options);
     const expectedSql = `( col IN ('1', (2), '3', 'some string', 'another string', someFunction(123), "column reference") )`;
     expect(sql).toEqual(expectedSql);
+  });
+
+  // The editor stores IN and NOT IN values as an array for every column type that is not
+  // boolean, number or date, not only for String and FixedString (#2225).
+  describe.each([FilterOperator.In, FilterOperator.NotIn])('%s filter', (operator) => {
+    it.each<{ type: string; value: string[]; list: string }>([
+      { type: "Enum8('x' = 1, 'y' = 2, 'z' = 3)", value: ['x', 'y'], list: "('x', 'y')" },
+      { type: "Nullable(Enum8('x' = 1, 'y' = 2, 'z' = 3))", value: ['x', 'y'], list: "('x', 'y')" },
+      { type: "Enum16('x' = 1, 'y' = 2, 'z' = 3)", value: ['x', 'y'], list: "('x', 'y')" },
+      {
+        type: 'UUID',
+        value: ['61f0c404-5cb3-11e7-907b-a6006ad3dba0', '00000000-0000-0000-0000-000000000000'],
+        list: "('61f0c404-5cb3-11e7-907b-a6006ad3dba0', '00000000-0000-0000-0000-000000000000')",
+      },
+      { type: 'IPv4', value: ['10.0.0.1', '10.0.0.2'], list: "('10.0.0.1', '10.0.0.2')" },
+      { type: 'IPv6', value: ['::1', '2001:db8::1'], list: "('::1', '2001:db8::1')" },
+      { type: 'Bool', value: ['true', 'false'], list: "('true', 'false')" },
+      { type: 'LowCardinality(String)', value: ['x', 'y'], list: "('x', 'y')" },
+    ])('renders the values as a list for $type', ({ type, value, list }) => {
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type, value }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} ${list} )`);
+    });
+
+    const enumType = "Enum8('x' = 1, 'y' = 2)";
+
+    it('wraps a multi-value variable in parentheses on an Enum column', () => {
+      // A multi-value variable interpolates to 'x','y', which is only valid inside the parentheses.
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type: enumType, value: ['$v'] }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} ($v) )`);
+    });
+
+    it('keeps a single string value on an Enum column as one value', () => {
+      // The editor always stores an array, but a query saved by hand can hold a plain string.
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type: enumType, value: 'x' }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} 'x' )`);
+    });
   });
 
   it('extracts Map value type for mapKey filter with Map(String, String)', () => {

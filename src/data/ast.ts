@@ -67,8 +67,14 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
 
 // TODO: support query parameters: https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
 
+/**
+ * The generated logs range filter ends in `$__toTime_ms + INTERVAL 1 MILLISECOND`, which pgsql-ast-parser
+ * cannot parse. Drop the offset so the filter reads like the seconds form (`$__toTime_ms`).
+ */
+const MS_BOUND_SUFFIX = /(\$__toTime_ms)\s*\+\s*INTERVAL\s+1\s+MILLISECOND/gi;
+
 export function sqlToStatement(rawSql: string): Statement {
-  const [replaceVars, variableSql] = replaceMacroVariables(rawSql);
+  const [replaceVars, variableSql] = replaceMacroVariables(rawSql.replace(MS_BOUND_SUFFIX, '$1'));
   const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
   const replaceParts = replaceVars.concat(replaceFuncs);
 
@@ -143,11 +149,13 @@ function qualifiedTableName(node: FromQueryNode): string | undefined {
 // FROM is a subquery it descends into that subquery, and only that subquery, so
 // a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
 // for the target. A FROM that references a CTE resolves to the CTE's underlying
-// table. A table-function FROM, or a top-level UNION, resolves to undefined.
+// table. A table-function FROM, or a top-level set operation, resolves to
+// undefined.
 function firstPhysicalTable(node: SelectQueryNode): string | undefined {
-  // A top-level UNION combines several tables; single-table targeting is not
-  // meaningful, so resolve to no table. Per-branch keying is a follow-up.
-  if (node.hasUnion) {
+  // A top-level UNION / INTERSECT / EXCEPT combines several tables; single-table
+  // targeting is not meaningful, so resolve to no table. Per-branch keying is a
+  // follow-up.
+  if (node.hasSetOperation) {
     return undefined;
   }
   const from = node.from;

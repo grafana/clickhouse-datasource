@@ -215,7 +215,10 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
 }
 
 function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean): { i: number; notFlag: boolean } {
-  if (e.name?.toLowerCase() === '$__fromtime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
+  const refName = e.name?.toLowerCase();
+  const isFromTime = refName === '$__fromtime' || refName === '$__fromtime_ms';
+  const isToTime = refName === '$__totime' || refName === '$__totime_ms';
+  if (isFromTime && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
     if (notFlag) {
       filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
       notFlag = false;
@@ -226,7 +229,7 @@ function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean
     i++;
     return { i, notFlag };
   }
-  if (e.name?.toLowerCase() === '$__totime') {
+  if (isToTime) {
     filters.splice(i, 1);
     return { i, notFlag };
   }

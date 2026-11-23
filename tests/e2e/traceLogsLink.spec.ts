@@ -124,6 +124,7 @@ const TRACE_A = 'e2e-trace-a';
 const TRACE_A_IN_WINDOW_LOG_COUNT = 3;
 
 const TRACE_LOGS_REFID = 'Trace Logs';
+const LINK_TABLE_DASHBOARD_UID = 'e2e-link-table-variables';
 const LOGS_VOLUME_REFID = 'log-volume-Trace Logs';
 
 function exploreUrl(query: Record<string, unknown>): string {
@@ -334,5 +335,71 @@ test.describe('trace→logs "View logs" data link', () => {
     expect(rawSql).toMatch(/\$__fromTime|toDateTime(64)?\(/);
     expect(rawSql).toContain(`'${TRACE_A}'`);
     expect(rawSql).not.toContain('ServiceName');
+  });
+
+  test('from a dashboard: opens the logs table a link variable chooses in another database', async ({
+    page,
+    request,
+  }) => {
+    const datasource = { type: PLUGIN_TYPE, uid: DATASOURCE_UID };
+    const dashboard = {
+      uid: LINK_TABLE_DASHBOARD_UID,
+      title: 'E2E link table variables',
+      schemaVersion: 39,
+      time: { from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO },
+      templating: {
+        list: [
+          { type: 'constant', name: 'clickhouse_link_logs_table', query: 'e2e_test_alt.trace_links_logs', hide: 2 },
+        ],
+      },
+      panels: [
+        {
+          id: 1,
+          type: 'table',
+          title: 'spans',
+          gridPos: { x: 0, y: 0, w: 24, h: 8 },
+          datasource,
+          targets: [
+            {
+              refId: 'A',
+              datasource,
+              editorType: 'sql',
+              format: 1,
+              queryType: 'table',
+              rawSql: `SELECT TraceId AS traceID, SpanName FROM e2e_test.trace_spans WHERE TraceId = '${TRACE_A}' LIMIT 1`,
+            },
+          ],
+        },
+      ],
+    };
+    expect((await request.post('/api/dashboards/db', { data: { dashboard, overwrite: true } })).ok()).toBe(true);
+
+    try {
+      await page.goto(`/d/${LINK_TABLE_DASHBOARD_UID}?orgId=1`);
+      await expect(page.getByText(TRACE_A, { exact: true }).first()).toBeVisible();
+
+      // A dashboard opens data links in a new tab, so wait on the whole browser context.
+      const traceLogsResponsePromise = page
+        .context()
+        .waitForEvent(
+          'response',
+          (r) =>
+            r.url().includes('/api/ds/query') &&
+            (r.request().postData() || '').includes(`"refId":"${TRACE_LOGS_REFID}"`)
+        );
+      await clickViewLogs(page, TRACE_A);
+
+      const traceLogsResponse = await traceLogsResponsePromise;
+      expect(traceLogsResponse.ok()).toBe(true);
+      // The link opens the table the variable chose, not the default e2e_test.trace_links_logs. A
+      // dashboard opens the link in a new tab without its time range, so Explore runs it over its
+      // default range and the row count of the fixture window cannot be checked here.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body: any = await traceLogsResponse.json();
+      expect(body?.results?.[TRACE_LOGS_REFID]?.status).toBe(200);
+      expect(traceLogsRawSql(traceLogsResponse)).toContain('"e2e_test_alt"."trace_links_logs"');
+    } finally {
+      await request.delete(`/api/dashboards/uid/${LINK_TABLE_DASHBOARD_UID}`);
+    }
   });
 });

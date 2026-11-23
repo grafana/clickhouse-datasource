@@ -55,6 +55,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -77,6 +79,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -106,6 +110,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -163,6 +169,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -192,6 +200,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -223,6 +233,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -254,6 +266,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -285,6 +299,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -316,6 +332,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={onShowLogLinksChange}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -342,6 +360,8 @@ describe('LogsConfig', () => {
       onContextColumnsChange: () => {},
       onShowLogLinksChange: () => {},
       onAdditionalColumnsChange: () => {},
+      onAttributeColumnsChange: () => {},
+      onAttributeColumnExclusionsChange: () => {},
     };
 
     // Placeholders the role text inputs use before the schema loads; once columns are fetched the
@@ -452,6 +472,8 @@ describe('LogsConfig', () => {
             additionalColumns: ['ServiceName'],
           }}
           onAdditionalColumnsChange={onAdditionalColumnsChange}
+          onAttributeColumnsChange={() => {}}
+          onAttributeColumnExclusionsChange={() => {}}
         />
       );
 
@@ -541,6 +563,46 @@ describe('LogsConfig', () => {
       ).not.toBeInTheDocument();
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(2);
       jest.useRealTimers();
+    });
+
+    // A failed first fetch (e.g. before credentials are saved) must not stick: when the saved version
+    // changes after Save & test, the schema is read again and the Columns picker appears.
+    it('re-fetches the schema when savedVersion changes after a failed fetch', async () => {
+      jest.useFakeTimers();
+      try {
+        const getColumnsCached = jest
+          .fn()
+          .mockRejectedValueOnce(new Error('connection refused'))
+          .mockResolvedValue(COLS);
+        mockGetDataSourceSrv.mockReturnValue({ get: async () => ({ getColumnsCached }) });
+        const props = {
+          ...noopHandlers,
+          variant: 'single-table' as const,
+          uid: 'ds-uid',
+          logsConfig: { defaultTable: 'otel_logs', otelEnabled: false },
+        };
+
+        const result = render(<LogsConfig {...props} savedVersion={1} />);
+        // Fire the debounce and let the rejected fetch settle
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(getColumnsCached).toHaveBeenCalledTimes(1);
+        expect(
+          result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+        ).not.toBeInTheDocument();
+
+        result.rerender(<LogsConfig {...props} savedVersion={2} />);
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(
+          result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+        ).toBeInTheDocument();
+        expect(getColumnsCached).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

@@ -21,6 +21,7 @@ import {
   testFuncs,
   fillMissingRoles,
   fitToTable,
+  backfillColumnTypes,
 } from './useBuilderOptionsState';
 import { defaultCHBuilderQuery } from 'types/sql';
 const { reducer, buildInitialState } = testFuncs;
@@ -259,6 +260,55 @@ describe('reducer', () => {
       expect(reducer(state, fitToTable('db', 'new_logs', []))).toBe(state);
     });
   });
+  describe('backfillColumnTypes', () => {
+    const tableColumns = [
+      { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+      { name: 'Body', type: 'String', picklistValues: [] },
+    ];
+
+    it('fills the missing type of hinted columns from the current state, keeping typed ones and columns without a hint', () => {
+      const state = {
+        ...buildInitialState(),
+        columns: [
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'Body', hint: ColumnHint.LogMessage, type: 'LowCardinality(String)' },
+          { name: 'Timestamp' },
+        ],
+      };
+      const next = reducer(state, backfillColumnTypes(tableColumns));
+      expect(next.columns).toEqual([
+        { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime64(9)' },
+        { name: 'Body', hint: ColumnHint.LogMessage, type: 'LowCardinality(String)' },
+        { name: 'Timestamp' },
+      ]);
+    });
+
+    it('returns the same state when nothing can be filled', () => {
+      const state = {
+        ...buildInitialState(),
+        columns: [{ name: 'Missing', hint: ColumnHint.Time }],
+      };
+      expect(reducer(state, backfillColumnTypes(tableColumns))).toBe(state);
+      expect(reducer(state, backfillColumnTypes([]))).toBe(state);
+    });
+
+    it('applies to columns replaced since it was dispatched', () => {
+      let state = buildInitialState();
+      state = reducer(state, setOptions({ columns: [{ name: 'Timestamp', hint: ColumnHint.Time }] }));
+      state = reducer(
+        state,
+        setOptions({
+          columns: [
+            { name: 'Timestamp', hint: ColumnHint.Time },
+            { name: 'Body', hint: ColumnHint.LogMessage },
+          ],
+        })
+      );
+      const next = reducer(state, backfillColumnTypes(tableColumns));
+      expect(next.columns?.map((c) => c.type)).toEqual(['DateTime64(9)', 'String']);
+    });
+  });
+
   it('applies SetTable keeping the rest of the query', async () => {
     const prevState = authoredState();
 

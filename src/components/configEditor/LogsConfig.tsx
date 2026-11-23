@@ -21,6 +21,9 @@ interface LogsConfigProps {
   // Datasource uid, used to fetch the configured table's real columns so the Columns field can be a
   // schema-backed multiselect. Absent (or unsaved) datasources fall back to a free-text column list.
   uid?: string;
+  // Saved-settings version of the datasource. It changes after Save & test, so the schema fetch re-runs
+  // once the connection works instead of staying on the result of an earlier failed fetch.
+  savedVersion?: number;
   onDefaultDatabaseChange: (v: string) => void;
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
@@ -33,6 +36,8 @@ interface LogsConfigProps {
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
   onAdditionalColumnsChange: (v: string[]) => void;
+  onAttributeColumnsChange: (v: string[]) => void;
+  onAttributeColumnExclusionsChange: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -49,6 +54,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onContextColumnsChange,
     onShowLogLinksChange,
     onAdditionalColumnsChange,
+    onAttributeColumnsChange,
+    onAttributeColumnExclusionsChange,
   } = props;
   let {
     defaultDatabase,
@@ -63,6 +70,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     contextColumns,
     showLogLinks,
     additionalColumns,
+    attributeColumns,
+    attributeColumnExclusions,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
   const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
@@ -125,7 +134,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
       ignore = true;
       clearTimeout(handle);
     };
-  }, [isSingleTable, props.uid, defaultDatabase, defaultTable]);
+  }, [isSingleTable, props.uid, props.savedVersion, defaultDatabase, defaultTable]);
 
   // The Columns field manages the extra projected columns (additionalColumns). Role columns
   // (time/level/message) are configured separately and projected via their roles, so Add all skips
@@ -286,6 +295,44 @@ export const LogsConfig = (props: LogsConfigProps) => {
             {`Not found in ${defaultTable}: ${unknownColumns.join(', ')}. These will fail log queries until corrected.`}
           </Text>
         )}
+        <InlineField
+          label={
+            <InlineFormLabel width={12} className="query-keyword" tooltip={labels.columns.attributeColumns.tooltip}>
+              {labels.columns.attributeColumns.label}
+            </InlineFormLabel>
+          }
+        >
+          <TagsInput
+            placeholder={labels.columns.attributeColumns.placeholder}
+            tags={attributeColumns || []}
+            onChange={(tags) => onAttributeColumnsChange(tags.map((t) => t.trim()).filter(Boolean))}
+            width={60}
+          />
+        </InlineField>
+        <Text variant="bodySmall" color="secondary">
+          {labels.columns.attributeColumns.description}
+        </Text>
+        <InlineField
+          label={
+            <InlineFormLabel
+              width={12}
+              className="query-keyword"
+              tooltip={labels.columns.attributeColumnExclusions.tooltip}
+            >
+              {labels.columns.attributeColumnExclusions.label}
+            </InlineFormLabel>
+          }
+        >
+          <TagsInput
+            placeholder={labels.columns.attributeColumnExclusions.placeholder}
+            tags={attributeColumnExclusions || []}
+            onChange={(tags) => onAttributeColumnExclusionsChange(tags.map((t) => t.trim()).filter(Boolean))}
+            width={60}
+          />
+        </InlineField>
+        <Text variant="bodySmall" color="secondary">
+          {labels.columns.attributeColumnExclusions.description}
+        </Text>
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>

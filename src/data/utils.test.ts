@@ -9,6 +9,7 @@ import {
 } from 'types/queryBuilder';
 import {
   applyTraceSearchFieldConfig,
+  bindTimeRangeMacros,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   foldDiscoveredLogFieldsIntoLabels,
@@ -24,6 +25,12 @@ import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, dateTime, Fiel
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import otel from 'otel';
+
+const mockTemplateSrv = { replace: jest.fn((value: string) => value) };
+jest.mock('@grafana/runtime', () => ({
+  ...(jest.requireActual('@grafana/runtime') as object),
+  getTemplateSrv: () => mockTemplateSrv,
+}));
 
 describe('isBuilderOptionsRunnable', () => {
   it('should return false for empty builder options', () => {
@@ -403,6 +410,31 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(getDefaultLogsColumns).toHaveBeenCalled();
     expect(getDefaultTraceEventsColumnPrefix).toHaveBeenCalled();
     expect(getDefaultTraceLinksColumnPrefix).toHaveBeenCalled();
+  });
+
+  it('leaves events and links out of the View trace query when no prefix is configured (#1715)', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.traces = {
+      defaultDatabase: 'app',
+      defaultTable: 'spans',
+      otelEnabled: false,
+      traceIdColumn: 'trace_id',
+      spanIdColumn: 'span_id',
+      startTimeColumn: 'started_at',
+      durationColumn: 'duration',
+    };
+    jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+    const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    const traceQuery = links?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+    expect(traceQuery.builderOptions.meta?.traceEventsColumnPrefix).toBe('');
+    expect(traceQuery.builderOptions.meta?.traceLinksColumnPrefix).toBe('');
+    expect(traceQuery.rawSql).toContain('"app"."spans"');
+    expect(traceQuery.rawSql).not.toContain('Events');
+    expect(traceQuery.rawSql).not.toContain('Links');
   });
 
   it('includes TraceId filter in View logs link query using configured column', async () => {
@@ -1074,6 +1106,39 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
   });
 });
 
+describe('bindTimeRangeMacros', () => {
+  const range = {
+    from: dateTime(1735689600123),
+    to: dateTime(1735693200456),
+    raw: { from: 'now-1h', to: 'now' },
+  };
+
+  it('binds the seconds macros to toDateTime, flooring from and ceiling to', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime AND t <= $__toTime', range)).toBe(
+      't >= toDateTime(1735689600) AND t <= toDateTime(1735693201)'
+    );
+  });
+
+  it('binds the millisecond macros to fromUnixTimestamp64Milli without mangling them', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime_ms AND t < $__toTime_ms + INTERVAL 1 MILLISECOND', range)).toBe(
+      't >= fromUnixTimestamp64Milli(1735689600123) AND t < fromUnixTimestamp64Milli(1735693200456) + INTERVAL 1 MILLISECOND'
+    );
+  });
+
+  it('binds both macro families in one query', () => {
+    const sql = bindTimeRangeMacros('a >= $__fromTime AND a <= $__toTime AND b >= $__fromTime_ms', range);
+    expect(sql).toBe(
+      'a >= toDateTime(1735689600) AND a <= toDateTime(1735693201) AND b >= fromUnixTimestamp64Milli(1735689600123)'
+    );
+    expect(sql).not.toContain('$__');
+    expect(sql).not.toContain(')_ms');
+  });
+
+  it('leaves the sql untouched without a range', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime_ms', undefined)).toBe('t >= $__fromTime_ms');
+  });
+});
+
 describe('transformTraceTagFields', () => {
   const makeRawSqlRequest = (): DataQueryRequest<CHQuery> => ({
     requestId: '',
@@ -1570,5 +1635,240 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
       'LogAttributes.x': 'y',
       SpanId: 'abc',
     });
+  });
+});
+
+describe('transformQueryResponseWithTraceAndLogLinks link table variables', () => {
+  const linkTables = {
+    traces: { database: 'obs_staging', table: 'otel_traces' },
+    logs: { database: 'obs_staging', table: 'otel_logs' },
+  };
+
+  const setup = (query: CHQuery) => {
+    const ds = newMockDatasource();
+    ds.settings.jsonData.traces = { otelEnabled: true, otelVersion: 'latest', durationUnit: TimeUnit.Nanoseconds };
+    ds.settings.jsonData.logs = { otelEnabled: true, otelVersion: 'latest' };
+    jest.spyOn(ds, 'getColumnsCached').mockResolvedValue([]);
+    jest.spyOn(ds, 'hasTraceTimestampTable').mockResolvedValue(false);
+    const request = {
+      requestId: '',
+      interval: '',
+      intervalMs: 0,
+      range: {} as any,
+      scopedVars: {} as any,
+      targets: [query],
+      timezone: '',
+      app: CoreApp.Dashboard,
+      startTime: 0,
+    } as DataQueryRequest<CHQuery>;
+    const response: DataQueryResponse = {
+      data: [
+        { refId: 'A', length: 1, fields: [{ name: 'TraceId', type: FieldType.string, config: {}, values: ['abc'] }] },
+      ],
+    };
+    return { ds, request, response };
+  };
+
+  const sqlQuery: CHQuery = {
+    refId: 'A',
+    editorType: EditorType.SQL,
+    rawSql: 'SELECT TraceId FROM x',
+    pluginVersion: '',
+  };
+
+  const linkQuery = (out: DataQueryResponse, title: string) =>
+    out.data[0].fields[0].config.links?.find((l: any) => l.title === title)?.internal?.query as
+      CHBuilderQuery | undefined;
+
+  it('points both links at the variable tables and shows them without datasource defaults', async () => {
+    const { ds, request, response } = setup(sqlQuery);
+    jest.spyOn(ds, 'resolveLinkTable').mockImplementation((signal) => linkTables[signal]);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    const trace = linkQuery(out, 'View trace');
+    const logs = linkQuery(out, 'View logs');
+    expect(trace?.builderOptions).toMatchObject({ database: 'obs_staging', table: 'otel_traces' });
+    expect(logs?.builderOptions).toMatchObject({ database: 'obs_staging', table: 'otel_logs' });
+    expect(trace?.rawSql).toContain('"obs_staging"."otel_traces"');
+    expect(logs?.rawSql).toContain('"obs_staging"."otel_logs"');
+    expect(trace?.builderOptions.meta?.linkTables).toEqual(linkTables);
+    expect(logs?.builderOptions.meta?.linkTables).toEqual(linkTables);
+  });
+
+  it('passes the request scoped vars to the variable lookup', async () => {
+    const { ds, request, response } = setup(sqlQuery);
+    const resolve = jest.spyOn(ds, 'resolveLinkTable').mockReturnValue(undefined);
+
+    await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(resolve).toHaveBeenCalledWith('traces', request.scopedVars);
+    expect(resolve).toHaveBeenCalledWith('logs', request.scopedVars);
+  });
+
+  it('keeps copying a builder trace query over the variable', async () => {
+    const { ds, request, response } = setup({
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      pluginVersion: '',
+      builderOptions: {
+        database: 'obs_production',
+        table: 'spans',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      },
+    });
+    jest.spyOn(ds, 'resolveLinkTable').mockImplementation((signal) => linkTables[signal]);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View trace')?.builderOptions).toMatchObject({ database: 'obs_production', table: 'spans' });
+    expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'obs_staging', table: 'otel_logs' });
+  });
+
+  it('uses the tables carried on a link query when the variables are not defined', async () => {
+    const { ds, request, response } = setup({
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      pluginVersion: '',
+      builderOptions: {
+        database: 'obs_staging',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+        meta: { isTraceIdMode: true, traceId: 'abc', linkTables },
+      },
+    });
+    jest.spyOn(ds, 'resolveLinkTable').mockReturnValue(undefined);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'obs_staging', table: 'otel_logs' });
+  });
+
+  const carriedTraceQuery = (database: string): CHQuery => ({
+    refId: 'A',
+    editorType: EditorType.Builder,
+    rawSql: '',
+    pluginVersion: '',
+    builderOptions: {
+      database,
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+      meta: { isTraceIdMode: true, traceId: 'abc', linkTables },
+    },
+  });
+
+  it('drops carried tables once the query targets another table', async () => {
+    const { ds, request, response } = setup(carriedTraceQuery('obs_production'));
+    ds.settings.jsonData.logs!.defaultDatabase = 'otel';
+    ds.settings.jsonData.logs!.defaultTable = 'otel_logs';
+    jest.spyOn(ds, 'resolveLinkTable').mockReturnValue(undefined);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'otel', table: 'otel_logs' });
+  });
+
+  it('prefers the dashboard variable over carried tables', async () => {
+    const { ds, request, response } = setup(carriedTraceQuery('obs_staging'));
+    jest
+      .spyOn(ds, 'resolveLinkTable')
+      .mockImplementation((signal) => (signal === 'logs' ? { database: 'obs_dev', table: 'otel_logs' } : undefined));
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'obs_dev', table: 'otel_logs' });
+  });
+
+  it('records the copied builder table, not the variable, for later links', async () => {
+    const { ds, request, response } = setup({
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      pluginVersion: '',
+      builderOptions: {
+        database: 'obs_production',
+        table: 'spans',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      },
+    });
+    jest.spyOn(ds, 'resolveLinkTable').mockImplementation((signal) => linkTables[signal]);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View trace')?.builderOptions.meta?.linkTables).toEqual({
+      traces: { database: 'obs_production', table: 'spans' },
+      logs: linkTables.logs,
+    });
+  });
+
+  it('records the default table too when a dashboard sets only one variable', async () => {
+    const { ds, request, response } = setup(sqlQuery);
+    ds.settings.jsonData.logs!.defaultDatabase = 'otel';
+    ds.settings.jsonData.logs!.defaultTable = 'otel_logs';
+    jest
+      .spyOn(ds, 'resolveLinkTable')
+      .mockImplementation((signal) => (signal === 'traces' ? linkTables.traces : undefined));
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'otel', table: 'otel_logs' });
+    expect(linkQuery(out, 'View trace')?.builderOptions.meta?.linkTables).toEqual({
+      traces: linkTables.traces,
+      logs: { database: 'otel', table: 'otel_logs' },
+    });
+  });
+
+  it('keeps the variable table of the other signal on the query a link opened, with one variable set', async () => {
+    // Dashboard: only clickhouse_link_traces_table is set, so View logs opens the default logs table.
+    const { ds, request, response } = setup(sqlQuery);
+    ds.settings.jsonData.traces!.defaultDatabase = 'otel';
+    ds.settings.jsonData.traces!.defaultTable = 'otel_traces';
+    ds.settings.jsonData.logs!.defaultDatabase = 'otel';
+    ds.settings.jsonData.logs!.defaultTable = 'otel_logs';
+    const resolve = jest
+      .spyOn(ds, 'resolveLinkTable')
+      .mockImplementation((signal) => (signal === 'traces' ? linkTables.traces : undefined));
+    const logsQuery = linkQuery(await transformQueryResponseWithTraceAndLogLinks(ds, request, response), 'View logs')!;
+
+    // In Explore the variables do not exist; View trace from the opened logs query.
+    resolve.mockReturnValue(undefined);
+    const explore = setup({ ...logsQuery, refId: 'A' });
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, explore.request, explore.response);
+
+    expect(linkQuery(out, 'View trace')?.builderOptions).toMatchObject(linkTables.traces);
+  });
+
+  it('resolves the dashboard variables through the template service', async () => {
+    const { ds, request, response } = setup(sqlQuery);
+    mockTemplateSrv.replace.mockImplementation((value: string) =>
+      value === '$clickhouse_link_logs_table' ? 'obs_dev.otel_logs' : value
+    );
+
+    try {
+      const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+      expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'obs_dev', table: 'otel_logs' });
+    } finally {
+      mockTemplateSrv.replace.mockImplementation((value: string) => value);
+    }
+  });
+
+  it('falls back to the datasource defaults when no variable or carried table exists', async () => {
+    const { ds, request, response } = setup(sqlQuery);
+    ds.settings.jsonData.traces!.defaultDatabase = 'otel';
+    ds.settings.jsonData.traces!.defaultTable = 'otel_traces';
+    jest.spyOn(ds, 'resolveLinkTable').mockReturnValue(undefined);
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
+
+    const trace = linkQuery(out, 'View trace');
+    expect(trace?.builderOptions).toMatchObject({ database: 'otel', table: 'otel_traces' });
+    expect(trace?.builderOptions.meta?.linkTables).toBeUndefined();
+    expect(linkQuery(out, 'View logs')).toBeUndefined();
   });
 });

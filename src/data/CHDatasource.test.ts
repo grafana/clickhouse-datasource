@@ -102,6 +102,72 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('resolveLinkTable', () => {
+    const resolveWith = (values: Record<string, string>) =>
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((v: string) => values[v] ?? v);
+
+    it('returns undefined when the variable is not defined', () => {
+      const ds = createInstance({});
+      resolveWith({});
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('splits a db.table value', () => {
+      const ds = createInstance({});
+      resolveWith({ $clickhouse_link_logs_table: 'obs_staging.otel_logs' });
+      expect(ds.resolveLinkTable('logs')).toEqual({ database: 'obs_staging', table: 'otel_logs' });
+    });
+
+    it('keeps the configured default table for a bare database', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.traces = { defaultTable: 'otel_traces' };
+      resolveWith({ $clickhouse_link_traces_table: 'obs_staging' });
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_staging', table: 'otel_traces' });
+    });
+
+    it('returns undefined for a bare database without the signal default table', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.defaultTable = 'bar';
+      ds.settings.jsonData.traces = {};
+      resolveWith({ $clickhouse_link_traces_table: 'obs_staging' });
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('expands variables nested in the value', () => {
+      const ds = createInstance({});
+      resolveWith({
+        $clickhouse_link_traces_table: '${database}.otel_traces',
+        '${database}.otel_traces': 'obs_dev.otel_traces',
+      });
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_dev', table: 'otel_traces' });
+    });
+
+    it('returns undefined when a nested variable is not defined', () => {
+      const ds = createInstance({});
+      resolveWith({ $clickhouse_link_traces_table: '${database}.otel_traces' });
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('keeps the first value of a multi-value variable', () => {
+      const ds = createInstance({});
+      jest
+        .spyOn(templateSrvMock, 'replace')
+        .mockImplementation((v: string, _scoped: unknown, format: (value: unknown) => string) =>
+          v === '$clickhouse_link_traces_table' ? format(['obs_dev', 'obs_prod']) : v
+        );
+      ds.settings.jsonData.traces = { defaultTable: 'otel_traces' };
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_dev', table: 'otel_traces' });
+    });
+
+    it('resolves with the request scoped vars', () => {
+      const ds = createInstance({});
+      const replace = resolveWith({ $clickhouse_link_traces_table: 'db.t' });
+      const scopedVars = { env: { text: 'db', value: 'db' } };
+      ds.resolveLinkTable('traces', scopedVars);
+      expect(replace).toHaveBeenCalledWith('$clickhouse_link_traces_table', scopedVars, expect.any(Function));
+    });
+  });
+
   describe('metricFindQuery', () => {
     it('fetches values', async () => {
       const mockedValues = [1, 100];
@@ -3871,6 +3937,37 @@ describe('ClickHouseDatasource', () => {
       { name: 'Start', type: 'DateTime64(9)', label: 'Start', picklistValues: [] },
       { name: 'End', type: 'DateTime64(9)', label: 'End', picklistValues: [] },
     ] as TableColumn[];
+
+  describe('trace events and links column prefix defaults', () => {
+    const withTraces = (traces: object) => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.traces = traces;
+      return ds;
+    };
+
+    it('uses the OTel prefixes when OTel is enabled', () => {
+      const ds = withTraces({ otelEnabled: true, otelVersion: 'latest' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Events');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('Links');
+    });
+
+    it('prefers the OTel prefixes over configured ones when OTel is enabled', () => {
+      const ds = withTraces({ otelEnabled: true, otelVersion: 'latest', traceEventsColumnPrefix: 'Ev' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Events');
+    });
+
+    it('uses the configured prefixes when OTel is disabled', () => {
+      const ds = withTraces({ otelEnabled: false, traceEventsColumnPrefix: 'Ev', traceLinksColumnPrefix: 'Ln' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Ev');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('Ln');
+    });
+
+    it('returns no prefix when OTel is disabled and none is configured (#1715)', () => {
+      const ds = withTraces({ otelEnabled: false, traceIdColumn: 'trace_id' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('');
+    });
+  });
 
   describe('hasTraceTimestampTable', () => {
     it('resolves false when database or table is empty', async () => {
