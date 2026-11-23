@@ -9,6 +9,16 @@ describe('ast', () => {
     });
   });
   describe('sqlToStatement', () => {
+    it('reads the names and variables inside a macro call back as written', () => {
+      const stm = sqlToStatement(
+        'SELECT Body FROM t WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)'
+      );
+      const where = JSON.stringify(stm.type === 'select' ? stm.where : undefined);
+      expect(where).toContain('"name":"ServiceName"');
+      expect(where).toContain('"name":"${service:singlequote}"');
+      expect(where).toContain('"name":"$service"');
+    });
+
     it('settings parse correctly', () => {
       const sql = 'SELECT count(*) FROM foo SETTINGS setting1=stuff setting2=stuff';
       const stm = sqlToStatement(sql);

@@ -741,6 +741,18 @@ describe('getQueryOptionsFromSql', () => {
       const sql = `SELECT Timestamp, ServiceName FROM "otel"."otel_logs" WHERE ( ServiceName = 'cart' ) ORDER BY Timestamp DESC LIMIT 10`;
       expect(generateSql(getQueryOptionsFromSql(sql))).toBe(sql);
     });
+
+    it('keeps the names inside macro calls', () => {
+      const filtered = getQueryOptionsFromSql('SELECT Body FROM "otel"."otel_logs" WHERE $__timeFilter(Timestamp)');
+      expect(filtered.filters).toEqual([
+        expect.objectContaining({ key: 'Timestamp', operator: FilterOperator.WithInGrafanaTimeRange }),
+      ]);
+      const bucketed = getQueryOptionsFromSql(
+        'SELECT $__timeInterval(Timestamp) as "time", count(*) FROM "otel"."otel_logs" GROUP BY time',
+        QueryType.TimeSeries
+      );
+      expect(bucketed.columns?.[0]).toEqual(expect.objectContaining({ name: 'Timestamp', alias: 'time' }));
+    });
   });
 
   describe('IS NULL and IS NOT NULL', () => {

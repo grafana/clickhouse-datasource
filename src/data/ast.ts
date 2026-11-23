@@ -146,11 +146,14 @@ export function sqlToStatement(rawSql: string): Statement {
       return map.super().expr(e);
     },
     call: (c) => {
+      // Map the arguments first, so the names inside a macro call keep their case too, as in
+      // `$__timeFilter(Timestamp)` or `$__timeInterval(Timestamp)`.
+      const call = map.super().call(c);
       const rf = replaceParts.find((x) => c.function.name.startsWith(x.replacementName));
-      if (rf) {
-        return { ...c, function: { ...c.function, name: c.function.name.replace(rf.replacementName, rf.name) } };
+      if (!rf || call?.type !== 'call') {
+        return call;
       }
-      return map.super().call(c);
+      return { ...call, function: { ...call.function, name: call.function.name.replace(rf.replacementName, rf.name) } };
     },
   }));
   return mapper.statement(ast)!;
