@@ -3938,6 +3938,37 @@ describe('ClickHouseDatasource', () => {
       { name: 'End', type: 'DateTime64(9)', label: 'End', picklistValues: [] },
     ] as TableColumn[];
 
+  describe('trace events and links column prefix defaults', () => {
+    const withTraces = (traces: object) => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.traces = traces;
+      return ds;
+    };
+
+    it('uses the OTel prefixes when OTel is enabled', () => {
+      const ds = withTraces({ otelEnabled: true, otelVersion: 'latest' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Events');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('Links');
+    });
+
+    it('prefers the OTel prefixes over configured ones when OTel is enabled', () => {
+      const ds = withTraces({ otelEnabled: true, otelVersion: 'latest', traceEventsColumnPrefix: 'Ev' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Events');
+    });
+
+    it('uses the configured prefixes when OTel is disabled', () => {
+      const ds = withTraces({ otelEnabled: false, traceEventsColumnPrefix: 'Ev', traceLinksColumnPrefix: 'Ln' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('Ev');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('Ln');
+    });
+
+    it('returns no prefix when OTel is disabled and none is configured (#1715)', () => {
+      const ds = withTraces({ otelEnabled: false, traceIdColumn: 'trace_id' });
+      expect(ds.getDefaultTraceEventsColumnPrefix()).toBe('');
+      expect(ds.getDefaultTraceLinksColumnPrefix()).toBe('');
+    });
+  });
+
   describe('hasTraceTimestampTable', () => {
     it('resolves false when database or table is empty', async () => {
       const ds = cloneDeep(mockDatasource);

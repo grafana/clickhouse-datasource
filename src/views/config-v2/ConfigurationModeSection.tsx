@@ -126,6 +126,7 @@ export const ConfigurationModeSection = (props: Props) => {
             <LogsConfig
               variant="single-table"
               uid={options.uid}
+              savedVersion={options.version}
               logsConfig={jsonData.logs}
               onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
               onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
