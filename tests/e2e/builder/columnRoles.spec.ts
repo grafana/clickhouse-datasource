@@ -31,12 +31,18 @@ function labelLocator(page: Page, labelText: string): Locator {
  * role="tooltip"; Playwright can target it once the hover has fired.
  */
 async function readTooltip(page: Page, label: Locator): Promise<string> {
-  // The icon is rendered inside the label; hovering the label surfaces the tooltip
-  // in all current @grafana/ui versions we support.
-  await label.locator('svg').first().hover();
+  const icon = label.locator('svg').first();
+  const iconLabel = icon.locator('xpath=ancestor::label[1]');
   const tooltip = page.getByRole('tooltip');
-  await expect(tooltip).toBeVisible();
-  return (await tooltip.textContent()) ?? '';
+  let text = '';
+  // The tooltip can close before the read, and only a fresh mouseenter on the icon reopens it.
+  await expect(async () => {
+    await iconLabel.hover({ position: { x: 1, y: 1 } });
+    await icon.hover();
+    await expect(tooltip).toBeVisible({ timeout: 5_000 });
+    text = (await tooltip.textContent({ timeout: 1_000 })) ?? '';
+  }).toPass({ timeout: 30_000 });
+  return text;
 }
 
 test.describe('Column roles guidance', () => {
