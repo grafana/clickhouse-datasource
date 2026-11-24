@@ -180,3 +180,18 @@ test.describe('SQL editor autocomplete', () => {
     expect(findDuplicates(tables), 'no table is listed twice').toEqual([]);
   });
 });
+
+test.describe('SQL editor autocomplete over a CTE', () => {
+  test('suggests the columns of the CTE that FROM names', async ({ page }) => {
+    await page.goto(exploreUrl());
+    // Every ClickHouse server has system.databases, so the test needs no fixture data. The CTE
+    // passes the columns through `*`, so they are not words of the query that Monaco could offer.
+    await typeSqlLeavingSuggestionsOpen(page, 'WITH dbs AS (SELECT * FROM system.databases) SELECT * FROM dbs WHERE ');
+    await page.keyboard.press('Control+Space');
+
+    const labels = page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row .label-name');
+    await expect
+      .poll(async () => (await labels.allTextContents()).map((l) => l.trim()))
+      .toEqual(expect.arrayContaining(['engine', 'name']));
+  });
+});
