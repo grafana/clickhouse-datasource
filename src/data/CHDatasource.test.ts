@@ -1510,6 +1510,54 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('metrics metadata lookups', () => {
+    const tablesFrame = arrayToDataFrame([
+      { name: 'otel_metrics_gauge' },
+      { name: 'otel_metrics_sum' },
+      { name: 'otel_metrics_histogram' },
+      { name: 'otel_metrics_exp_histogram' },
+      { name: 'otel_metrics_summary' },
+    ]);
+    const catalogFrame = arrayToDataFrame([{ name: 'cpu', type: 'gauge', unit: '1', description: '', monotonic: 0 }]);
+
+    const instance = () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      return { ds, spy };
+    };
+
+    // A new alert rule has no dashboard time range, and without one the lookups read from 1970.
+    it('falls back to the last 6 hours when the page has no time range', async () => {
+      const { ds, spy } = instance();
+      delete (templateSrvMock as any).timeRange;
+
+      await ds.fetchMetricCatalog();
+
+      const range = spy.mock.calls[1][0].range as TimeRange;
+      expect(range.from).toBeDefined();
+      expect(range.to.valueOf() - range.from.valueOf()).toBe(6 * 60 * 60 * 1000);
+      expect(range.to.valueOf()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('uses the page time range when there is one', async () => {
+      const { ds, spy } = instance();
+      const range = { from: dateTime(1735689600000), to: dateTime(1735693200000) };
+      (templateSrvMock as any).timeRange = range;
+
+      try {
+        await ds.fetchMetricCatalog();
+      } finally {
+        delete (templateSrvMock as any).timeRange;
+      }
+
+      expect(spy.mock.calls[1][0].range).toBe(range);
+    });
+  });
+
   describe('distinct value suggestions', () => {
     it('escapes identifiers for distinct column values', async () => {
       const ds = cloneDeep(mockDatasource);

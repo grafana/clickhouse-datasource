@@ -11,6 +11,7 @@ import {
   DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
   DataSourceWithToggleableQueryFiltersSupport,
+  dateTime,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -1391,7 +1392,7 @@ export class Datasource
     const response = await firstValueFrom(
       this.query({
         targets: [{ rawSql, format: 1, refId: 'metrics-metadata' }],
-        range: (getTemplateSrv() as any).timeRange,
+        range: this.metricsLookupRange(),
       } as DataQueryRequest<CHQuery>)
     );
     const error = response.errors?.[0];
@@ -1399,6 +1400,20 @@ export class Datasource
       throw new Error(error.message || 'Query failed');
     }
     return response.data[0] || { fields: [], length: 0 };
+  }
+
+  /**
+   * The range of the metrics editor's metadata lookups. A page without a dashboard range, such as a
+   * new alert rule, falls back to the last 6 hours, the window the discovery queries already read.
+   */
+  private metricsLookupRange(): TimeRange {
+    const range = (getTemplateSrv() as any).timeRange as TimeRange | undefined;
+    if (range?.from && range?.to) {
+      return range;
+    }
+    const to = dateTime();
+    const from = dateTime(to.valueOf() - 6 * 60 * 60 * 1000);
+    return { from, to, raw: { from: from.toISOString(), to: to.toISOString() } };
   }
 
   /** The values of a metadata query's column, by name. */
