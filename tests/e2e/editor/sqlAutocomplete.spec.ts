@@ -5,6 +5,7 @@
 
 import { expect, test } from '@grafana/plugin-e2e';
 import type { Page } from '@playwright/test';
+import { DATASOURCE_UID, PLUGIN_TYPE, skipFixtureTestsOnCloud } from '../helpers/env';
 import { exploreUrl } from '../helpers/explore';
 
 /**
@@ -37,6 +38,16 @@ function findDuplicates(labels: string[]): string[] {
   const dupes = new Set<string>();
   labels.forEach((l) => (seen.has(l) ? dupes.add(l) : seen.add(l)));
   return [...dupes];
+}
+
+/** An Explore URL with queries A and B open in the SQL editor, so two SqlEditors are mounted. */
+function exploreUrlWithTwoSqlQueries(): string {
+  const datasource = { type: PLUGIN_TYPE, uid: DATASOURCE_UID };
+  const queries = ['A', 'B'].map((refId) => ({ refId, datasource, editorType: 'sql', pluginVersion: '', rawSql: '' }));
+  const panes = JSON.stringify({
+    explore: { datasource: DATASOURCE_UID, queries, range: { from: 'now-1h', to: 'now' } },
+  });
+  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
 /**
@@ -99,5 +110,20 @@ test.describe('SQL editor autocomplete', () => {
     const secondMountLabels = await captureMacroLabels(page);
     expect(findDuplicates(secondMountLabels), 'second mount has no duplicate macros').toEqual([]);
     expect(new Set(secondMountLabels)).toEqual(new Set(firstMountLabels));
+  });
+
+  test('lists each table once with two SQL queries open', async ({ page, explorePage }) => {
+    skipFixtureTestsOnCloud('seed.sql');
+    await page.goto(exploreUrlWithTwoSqlQueries());
+
+    // Each SqlEditor registers a completion provider for the shared sql language and Monaco asks
+    // all of them, so an editor that answered for the other editor's model listed every table twice.
+    await explorePage.getQueryEditorRow('B').getByRole('code').click();
+    await page.keyboard.type('SELECT * FROM e2e_test.');
+
+    const labels = page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row .label-name');
+    await expect(labels.filter({ hasText: /^events$/ })).toHaveCount(1);
+    const tables = (await labels.allTextContents()).map((l) => l.trim());
+    expect(findDuplicates(tables), 'no table is listed twice').toEqual([]);
   });
 });
