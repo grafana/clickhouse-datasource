@@ -834,7 +834,7 @@ func TestSettingsLongToWideCellLimit(t *testing.T) {
 		DecryptedSecureJSONData: map[string]string{},
 	}
 	ds := (&Clickhouse{}).Settings(t.Context(), config)
-	assert.Equal(t, int64(100_000_000), ds.LongToWideCellLimit)
+	assert.Zero(t, ds.LongToWideCellLimit)
 }
 
 func TestSettingsForwardHeadersWithJWT(t *testing.T) {
