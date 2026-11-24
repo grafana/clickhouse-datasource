@@ -1,4 +1,5 @@
 import {
+  Filter,
   FilterOperator,
   MetricFunction,
   MetricLabel,
@@ -225,7 +226,56 @@ describe('generateMetricsQuery', () => {
       value: 'prod',
     };
     const sql = generateSql(options(metric(), { filters: [filter] }));
-    expect(sql).toContain("AND (( ResourceAttributes['k8s.namespace.name'] = 'prod' ))");
+    expect(sql).toContain("AND (ResourceAttributes['k8s.namespace.name'] = 'prod')");
+  });
+
+  describe('label filter values', () => {
+    const labelFilter = (operator: FilterOperator, value: string | string[]): Filter =>
+      ({
+        filterType: 'custom',
+        key: 'Attributes',
+        mapKey: 'os.description',
+        type: 'Map(String, String)',
+        condition: 'AND',
+        operator,
+        value,
+      }) as Filter;
+    const filterSql = (operator: FilterOperator, value: string | string[]) =>
+      generateSql(options(metric(), { filters: [labelFilter(operator, value)] }));
+
+    it('quotes a value the builder would leave unquoted', () => {
+      // A picked value holding parentheses is a syntax error without quotes.
+      expect(filterSql(FilterOperator.Equals, 'Linux 6.1 (amd64)')).toContain(
+        "Attributes['os.description'] = 'Linux 6.1 (amd64)'"
+      );
+      expect(filterSql(FilterOperator.NotEquals, 'Linux 6.1 (amd64)')).toContain(
+        "Attributes['os.description'] != 'Linux 6.1 (amd64)'"
+      );
+    });
+
+    it('quotes and escapes every value of a list', () => {
+      expect(filterSql(FilterOperator.In, ['Linux 6.1 (amd64)', "a'b"])).toContain(
+        `Attributes['os.description'] IN ('Linux 6.1 (amd64)', 'a\\'b')`
+      );
+      expect(filterSql(FilterOperator.NotIn, ['Linux 6.1 (amd64)', "a'b"])).toContain(
+        `Attributes['os.description'] NOT IN ('Linux 6.1 (amd64)', 'a\\'b')`
+      );
+    });
+
+    it('filters on empty values', () => {
+      expect(filterSql(FilterOperator.IsEmpty, '')).toContain("Attributes['os.description'] = ''");
+      expect(filterSql(FilterOperator.IsNotEmpty, '')).toContain("Attributes['os.description'] != ''");
+    });
+
+    it('keeps the operators the builder renders', () => {
+      expect(filterSql(FilterOperator.Like, 'Linux')).toContain("Attributes['os.description'] LIKE '%Linux%'");
+    });
+
+    it('interpolates a value naming a dashboard variable', () => {
+      expect(filterSql(FilterOperator.Equals, '$os')).toContain(
+        "$__conditionalAll(Attributes['os.description'] IN (${os:singlequote}), $os)"
+      );
+    });
   });
 
   it('never buckets finer than the minimum step', () => {
@@ -266,7 +316,7 @@ describe('generateMetricsQuery', () => {
         'SELECT __time AS time, __label_0 AS "http.route", sum(__d0 / nullIf(__seconds, 0)) AS "http.server.requests"' +
           '' +
           '' +
-          " FROM (SELECT __time, __label_0, __series, sum(__in0 + if(NOT __is_delta AND __prev0 IS NOT NULL, if(__first0 >= __prev0, __first0 - __prev0, __first0), 0)) AS __d0, sum(__secs + if(NOT __is_delta AND __prev0 IS NOT NULL, dateDiff('millisecond', __prev_t, __first_t) / 1000, 0)) AS __seconds FROM (SELECT *, lagInFrame(toNullable(__last0)) OVER w AS __prev0, lagInFrame(toNullable(__last_t)) OVER w AS __prev_t FROM (SELECT $__timeInterval(TimeUnix) AS __time, Attributes['http.route'] AS __label_0, cityHash64(ResourceAttributes, ScopeName, ScopeAttributes, Attributes) AS __series, if(AggregationTemporality = 1, toDateTime(0), StartTimeUnix) AS __run, any(AggregationTemporality = 1) AS __is_delta, if(__is_delta, sum(toFloat64(Value)), deltaSumTimestamp(toFloat64(Value), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9)))) AS __in0, argMin(toFloat64(Value), TimeUnix) AS __first0, argMax(toFloat64(Value), TimeUnix) AS __last0, min(TimeUnix) AS __first_t, max(TimeUnix) AS __last_t, if(__is_delta, sum(if(StartTimeUnix > toDateTime(0) AND StartTimeUnix < TimeUnix, dateDiff('millisecond', StartTimeUnix, TimeUnix), 0) / 1000), dateDiff('millisecond', __first_t, __last_t) / 1000) AS __secs" +
+          " FROM (SELECT __time, __label_0, __series, sum(__in0 + if(NOT __is_delta AND __prev0 IS NOT NULL, if(__first0 >= __prev0, __first0 - __prev0, __first0), 0)) AS __d0, sum(__secs + if(NOT __is_delta AND __prev0 IS NOT NULL, dateDiff('millisecond', __prev_t, __first_t) / 1000, 0)) AS __seconds FROM (SELECT *, lagInFrame(toNullable(__last0)) OVER w AS __prev0, lagInFrame(toNullable(__last_t)) OVER w AS __prev_t FROM (SELECT $__timeInterval(TimeUnix) AS __time, Attributes['http.route'] AS __label_0, cityHash64(ResourceAttributes, ScopeName, ScopeAttributes, Attributes) AS __series, if(AggregationTemporality = 1, toDateTime(0), StartTimeUnix) AS __run, any(AggregationTemporality = 1) AS __is_delta, argMin(toFloat64(Value), TimeUnix) AS __first0, argMax(toFloat64(Value), TimeUnix) AS __last0, if(__is_delta, sum(toFloat64(Value)), if(__last0 >= __first0, __last0 - __first0, deltaSumTimestamp(toFloat64(Value), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9))))) AS __in0, min(TimeUnix) AS __first_t, max(TimeUnix) AS __last_t, if(__is_delta, sum(if(StartTimeUnix > toDateTime(0) AND StartTimeUnix < TimeUnix, dateDiff('millisecond', StartTimeUnix, TimeUnix), 0) / 1000), dateDiff('millisecond', __first_t, __last_t) / 1000) AS __secs" +
           ' FROM "otel"."otel_metrics_sum" WHERE MetricName = \'http.server.requests\' AND TimeUnix >= subtractSeconds($__fromTime, greatest($__interval_s, 600)) AND TimeUnix <= $__toTime GROUP BY __time, __label_0, __series, __run)' +
           ' WINDOW w AS (PARTITION BY __series ORDER BY __first_t ASC ROWS BETWEEN 1 PRECEDING AND CURRENT ROW))' +
           ' WHERE __time >= $__timeInterval($__fromTime) GROUP BY __time, __label_0, __series' +
@@ -284,9 +334,7 @@ describe('generateMetricsQuery', () => {
       const sql = generateSql(
         options({ ...counter, type: MetricType.Histogram, isMonotonic: undefined }, { table: 'otel_metrics_histogram' })
       );
-      expect(sql).toContain(
-        'deltaSumTimestamp(toFloat64(Count), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9)))) AS __in0'
-      );
+      expect(sql).toContain('if(__last0 >= __first0, __last0 - __first0, deltaSumTimestamp(toFloat64(Count), ');
       expect(sql).not.toContain('__first1');
     });
 
@@ -294,9 +342,7 @@ describe('generateMetricsQuery', () => {
       const sql = generateSql(
         options({ ...counter, type: MetricType.Histogram, fn: MetricFunction.SumRate }, { table: 'h' })
       );
-      expect(sql).toContain(
-        'deltaSumTimestamp(toFloat64(Sum), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9)))) AS __in0'
-      );
+      expect(sql).toContain('if(__last0 >= __first0, __last0 - __first0, deltaSumTimestamp(toFloat64(Sum), ');
       // Resets are detected on the count, tracked as the second value.
       expect(sql).toContain('argMin(toFloat64(Count), TimeUnix) AS __first1');
       expect(sql).toContain('if(__first1 >= __prev1, __first0 - __prev0, __first0)');
@@ -306,12 +352,8 @@ describe('generateMetricsQuery', () => {
       const sql = generateSql(
         options({ ...counter, type: MetricType.ExponentialHistogram, fn: MetricFunction.AvgValue }, { table: 'e' })
       );
-      expect(sql).toContain(
-        'deltaSumTimestamp(toFloat64(Sum), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9)))) AS __in0'
-      );
-      expect(sql).toContain(
-        'deltaSumTimestamp(toFloat64(Count), toUnixTimestamp64Nano(toDateTime64(TimeUnix, 9)))) AS __in1'
-      );
+      expect(sql).toContain('if(__last0 >= __first0, __last0 - __first0, deltaSumTimestamp(toFloat64(Sum), ');
+      expect(sql).toContain('if(__last1 >= __first1, __last1 - __first1, deltaSumTimestamp(toFloat64(Count), ');
       expect(sql).toContain('sum(__d0) / nullIf(sum(__d1), 0) AS "http.server.requests"');
     });
 

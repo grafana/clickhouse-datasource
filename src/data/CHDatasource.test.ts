@@ -23,6 +23,7 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
@@ -1555,6 +1556,29 @@ describe('ClickHouseDatasource', () => {
       }
 
       expect(spy.mock.calls[1][0].range).toBe(range);
+    });
+
+    it('does not cache a database without metric tables', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      const tableQueries = () =>
+        spy.mock.calls.filter((call) => String(call[0].targets[0].rawSql).startsWith('SHOW TABLES')).length;
+
+      expect(await ds.resolveMetricTables()).toEqual({});
+      expect(await ds.resolveMetricTables()).toEqual({});
+      // A page opened before the exporter creates its tables retries instead of staying empty.
+      expect(tableQueries()).toBe(2);
+
+      spy.mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      const tables = await ds.resolveMetricTables();
+      expect(tables[MetricType.Gauge]).toBe('otel_metrics_gauge');
+      expect(tables[MetricType.Summary]).toBe('otel_metrics_summary');
+      await ds.resolveMetricTables();
+      expect(tableQueries()).toBe(3);
     });
   });
 

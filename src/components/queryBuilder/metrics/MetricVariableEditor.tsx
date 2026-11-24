@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Combobox, ComboboxOption, InlineField, InlineFormLabel, Stack } from '@grafana/ui';
+import { Alert, Button, Combobox, ComboboxOption, InlineField, InlineFormLabel, Stack } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import {
   getMetricFilterDisplayName,
@@ -112,6 +112,16 @@ export const MetricVariableEditor = ({ datasource, query, onChange }: Props) => 
 
   return (
     <div data-testid="metric-variable-editor">
+      {tables.error && (
+        <Alert severity="error" title="Could not list the metric tables">
+          {tables.error}
+        </Alert>
+      )}
+      {catalog.error && (
+        <Alert severity="error" title="Could not list the metrics">
+          {catalog.error}
+        </Alert>
+      )}
       <InlineField label={label('Metric', 'Optional. Without a metric, every metric table is read.')}>
         <Combobox
           aria-label="Variable metric"
@@ -145,6 +155,11 @@ export const MetricVariableEditor = ({ datasource, query, onChange }: Props) => 
               width={40}
             />
           </InlineField>
+          {labelKeys.error && (
+            <Alert severity="error" title="Could not list the metric labels">
+              {labelKeys.error}
+            </Alert>
+          )}
 
           <InlineField
             label={label('Filters', 'Narrow the values, for example by another variable: service = $service.')}

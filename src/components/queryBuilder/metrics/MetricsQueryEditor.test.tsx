@@ -18,7 +18,8 @@ import {
   MetricsQueryEditor,
   parseQuantile,
   pickSummaryQuantiles,
-} from './MetricsQueryEditor';import { toMetricLabelFilter, getMetricLabelOptions } from './MetricLabelFilterEditor';
+} from './MetricsQueryEditor';
+import { toMetricLabelFilter, getMetricLabelOptions } from './MetricLabelFilterEditor';
 
 const editorSelectors = selectors.components.QueryBuilder.MetricsEditor;
 
@@ -239,6 +240,63 @@ describe('MetricsQueryEditor', () => {
 
     const inDashboard = getSelectableFunctions(MetricType.Histogram, false, CoreApp.Dashboard);
     expect(inDashboard).toContain(MetricFunction.Heatmap);
+  });
+
+  it('shows the errors of failed lookups instead of an empty editor', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_metrics_histogram',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: 'http.server.duration',
+        type: MetricType.Histogram,
+        fn: MetricFunction.Quantile,
+        quantiles: [0.95],
+        aggregation: MetricSeriesAggregation.Avg,
+        groupBy: [],
+      },
+    };
+    const datasource = createDatasource();
+    (datasource.resolveMetricTables as jest.Mock).mockRejectedValue(new Error('no tables'));
+    (datasource.fetchMetricCatalog as jest.Mock).mockRejectedValue(new Error('no metrics'));
+    (datasource.fetchMetricLabelKeys as jest.Mock).mockRejectedValue(new Error('no labels'));
+    (datasource.fetchMetricHealth as jest.Mock).mockRejectedValue(new Error('no series'));
+    renderEditor(options, datasource);
+
+    await waitFor(() => expect(screen.getByText('no labels')).toBeInTheDocument());
+    expect(screen.getByText('Could not list the metric tables')).toBeInTheDocument();
+    expect(screen.getByText('no tables')).toBeInTheDocument();
+    expect(screen.getByText('Could not list the metrics')).toBeInTheDocument();
+    expect(screen.getByText('no metrics')).toBeInTheDocument();
+    expect(screen.getByText('Could not list the metric labels')).toBeInTheDocument();
+    expect(screen.getByText('Could not check the metric series')).toBeInTheDocument();
+    expect(screen.getByText('no series')).toBeInTheDocument();
+  });
+
+  it('shows a failed attribute probe when a metric is picked', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: '',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: '',
+        type: MetricType.Gauge,
+        fn: MetricFunction.Avg,
+        aggregation: MetricSeriesAggregation.Avg,
+        groupBy: [],
+      },
+    };
+    const datasource = createDatasource();
+    (datasource.getMetricTableFeatures as jest.Mock).mockRejectedValue(new Error('no columns'));
+    renderEditor(options, datasource);
+    const picker = screen.getByTestId(editorSelectors.metricPicker).querySelector('input')!;
+    await waitFor(() => expect(picker).toHaveAttribute('placeholder', 'Search 2 metrics'));
+
+    await userEvent.type(picker, 'http.server.requests');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByText('Could not read the columns of the metric table')).toBeInTheDocument());
+    expect(screen.getByText('no columns')).toBeInTheDocument();
   });
 
   it('opens the label filter editor', async () => {

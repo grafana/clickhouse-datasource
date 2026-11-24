@@ -293,9 +293,11 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
 
   // Picking a metric runs a few lookups for it. Only the latest pick is applied, on top of any
   // edits made while the lookups ran.
+  const [pickError, setPickError] = useState<string | undefined>();
   const lastPick = useRef(0);
   const onMetricChange = async (value: string) => {
     setHeatmapReplaced(false);
+    setPickError(undefined);
     const pick = ++lastPick.current;
     const { type, name } = parseMetricOptionValue(value);
     const entry = catalog.value.find((e) => e.type === type && e.name === name) ?? {
@@ -306,7 +308,16 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
       isMonotonic: false,
     };
     const table = tables.value[type] ?? datasource.getConfiguredMetricTables()[type];
-    const features: MetricTableFeatures = await datasource.getMetricTableFeatures(database, table).catch(() => ({}));
+    let features: MetricTableFeatures = {};
+    try {
+      features = await datasource.getMetricTableFeatures(database, table);
+    } catch (error) {
+      // Assuming a plain String column would read an attribute column as JSON, or the other way
+      // around, so the failure is shown instead of silently picking one.
+      if (pick === lastPick.current) {
+        setPickError(error instanceof Error ? error.message : String(error));
+      }
+    }
     const jsonAttributes = Boolean(features.jsonAttributes);
     const [labels, reportedQuantiles, metricHealth] = await Promise.all([
       metric?.name
@@ -419,6 +430,26 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
         {catalog.error && (
           <Alert severity="error" title="Could not list the metrics">
             {catalog.error}
+          </Alert>
+        )}
+        {labelKeys.error && (
+          <Alert severity="error" title="Could not list the metric labels">
+            {labelKeys.error}
+          </Alert>
+        )}
+        {summaryQuantiles.error && (
+          <Alert severity="error" title="Could not list the summary quantiles">
+            {summaryQuantiles.error}
+          </Alert>
+        )}
+        {health.error && (
+          <Alert severity="error" title="Could not check the metric series">
+            {health.error}
+          </Alert>
+        )}
+        {pickError && (
+          <Alert severity="error" title="Could not read the columns of the metric table">
+            {pickError}
           </Alert>
         )}
         {heatmapReplaced && (

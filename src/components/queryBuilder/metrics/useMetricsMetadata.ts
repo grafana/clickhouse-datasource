@@ -51,8 +51,9 @@ export const useMetricTables = (datasource: Datasource) =>
   useAsync(`${datasource.uid}`, emptyTables, () => datasource.resolveMetricTables());
 
 /**
- * The metrics with data in the dashboard time range. `rangeKey` reloads the list when the time
- * range changes, so the browser follows the dashboard.
+ * The metrics with data in the last 6 hours of the dashboard time range, so a long range does not
+ * read every metric table to fill the list. `rangeKey` reloads the list when the time range
+ * changes, so the browser follows the dashboard.
  */
 export const useMetricCatalog = (datasource: Datasource, rangeKey: string, reloadKey: number) =>
   useAsync(`${datasource.uid}:${rangeKey}:${reloadKey}`, emptyCatalog, () => datasource.fetchMetricCatalog());

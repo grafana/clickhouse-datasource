@@ -1436,18 +1436,25 @@ export class Datasource
 
   /**
    * The metric tables that exist, by type. Looked up once per data source instance, since the
-   * exporter creates its tables up front.
+   * exporter creates its tables up front. A database without a single metric table is not cached:
+   * a dashboard opened before the exporter created them would otherwise stay empty for the life of
+   * the data source, reload button included.
    */
   resolveMetricTables(): Promise<MetricTables> {
     const database = this.getDefaultMetricsDatabase();
-    return this.cachedMetricsLookup(`tables:${database}`, async () => {
+    const key = `tables:${database}`;
+    return this.cachedMetricsLookup(key, async () => {
       const column = await this.fetchMetricsColumns(`SHOW TABLES FROM ${escapeIdentifier(database)}`);
       const tables = column('name').map(String);
-      return resolveMetricTables(this.getConfiguredMetricTables(), tables);
+      const resolved = resolveMetricTables(this.getConfiguredMetricTables(), tables);
+      if (Object.keys(resolved).length === 0) {
+        this.metricsCache.delete(key);
+      }
+      return resolved;
     });
   }
 
-  /** The metrics with data in the dashboard time range, across every metric table. */
+  /** The metrics with data in the last 6 hours of the dashboard time range, across every metric table. */
   async fetchMetricCatalog(): Promise<MetricCatalogEntry[]> {
     const rawSql = getMetricCatalogSql(this.getDefaultMetricsDatabase(), await this.resolveMetricTables());
     if (!rawSql) {

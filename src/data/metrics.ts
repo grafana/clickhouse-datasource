@@ -193,17 +193,56 @@ const getVariableFilterSql = (filter: Filter, label: MetricLabel, jsonAttributes
 };
 
 /**
- * The label filters of a metrics query as SQL, joined with AND. Filters on dashboard variables
- * get variable-aware SQL; the rest use the builder's filter SQL.
+ * A filter value the user typed or picked, as SQL. The builder renders values holding parentheses
+ * or quotes unquoted, which turns a picked value like `Linux 6.1 (amd64)` into a syntax error, so
+ * label values are quoted here. A value naming a dashboard variable stays unquoted, so it
+ * interpolates like the rest of the builder.
+ */
+const getLabelFilterValueSql = (value: unknown): string => {
+  const text = typeof value === 'string' ? value : String(value ?? '');
+  return /\$\w|\$\{|\[\[/.test(text) ? text : quoteString(text);
+};
+
+/**
+ * A label filter with a typed or picked value, as SQL. Operators that wrap the value themselves,
+ * such as LIKE and its negation, return undefined to keep the builder's rendering.
+ */
+const getLabelFilterSql = (filter: Filter, label: MetricLabel, jsonAttributes?: boolean): string | undefined => {
+  const expression = getMetricLabelExpression(label, jsonAttributes);
+  const value = 'value' in filter ? filter.value : undefined;
+  const values = (Array.isArray(value) ? value : [value]).map(getLabelFilterValueSql);
+  switch (filter.operator) {
+    case FilterOperator.IsEmpty:
+      return `${expression} = ''`;
+    case FilterOperator.IsNotEmpty:
+      return `${expression} != ''`;
+    case FilterOperator.Equals:
+      return `${expression} = ${values[0]}`;
+    case FilterOperator.NotEquals:
+      return `${expression} != ${values[0]}`;
+    case FilterOperator.In:
+      return `${expression} IN (${values.join(', ')})`;
+    case FilterOperator.NotIn:
+      return `${expression} NOT IN (${values.join(', ')})`;
+    default:
+      return undefined;
+  }
+};
+
+/**
+ * The label filters of a metrics query as SQL, joined with AND. Label values are quoted; filters on
+ * dashboard variables get variable-aware SQL, and filters on other columns the builder's filter SQL.
  */
 export const getMetricFilterSql = (filters: Filter[] = [], jsonAttributes?: boolean): string => {
   const conditions: string[] = [];
   const plain: Filter[] = [];
   for (const filter of filters) {
     const label = getFilterMetricLabel(filter);
-    const variableSql = label && getVariableFilterSql(filter, label, jsonAttributes);
-    if (variableSql) {
-      conditions.push(`(${variableSql})`);
+    const labelSql =
+      label &&
+      (getVariableFilterSql(filter, label, jsonAttributes) ?? getLabelFilterSql(filter, label, jsonAttributes));
+    if (labelSql) {
+      conditions.push(`(${labelSql})`);
     } else {
       plain.push(filter);
     }
@@ -520,8 +559,10 @@ const isDeltaExpression = (type: MetricType): string => (hasTemporality(type) ? 
  * with the raw points of the range.
  *
  * A run is the points sharing one StartTimeUnix: OTel starts a new one when a counter restarts.
- * Inside a run the increase is exact (deltaSumTimestamp). Between consecutive runs or buckets of a
- * series, the first value is compared with the previous last value: a drop of the reset column
+ * Inside a run the increase is the last value minus the first, which does not depend on the order
+ * the parts are read in; a run that resets, where that difference is negative, is summed delta by
+ * delta instead. Between consecutive runs or buckets of a series, the first value is compared with
+ * the previous last value: a drop of the reset column
  * (the value itself, or the Count of a histogram) is a counter reset, after which the new value is
  * the increase, as in PromQL. Delta points are their own increase. Rows are read from slightly
  * before the time range, so the first bucket has a previous value.
@@ -553,14 +594,15 @@ const generateCounterQuery = (
     `${ctx.seriesKey} AS __series`,
     runKey(metric.type),
     `any(${isDeltaExpression(metric.type)}) AS __is_delta`,
-    ...values.map(
-      (value, i) =>
-        `if(__is_delta, sum(toFloat64(${value})), deltaSumTimestamp(toFloat64(${value}), ${pointOrder})) AS __in${i}`
-    ),
     ...tracked.flatMap((value, i) => [
       `argMin(toFloat64(${value}), ${metricTimeColumn}) AS __first${i}`,
       `argMax(toFloat64(${value}), ${metricTimeColumn}) AS __last${i}`,
     ]),
+    ...values.map(
+      (value, i) =>
+        `if(__is_delta, sum(toFloat64(${value})), ` +
+        `if(__last${i} >= __first${i}, __last${i} - __first${i}, deltaSumTimestamp(toFloat64(${value}), ${pointOrder}))) AS __in${i}`
+    ),
     `min(${metricTimeColumn}) AS __first_t`,
     `max(${metricTimeColumn}) AS __last_t`,
     `if(__is_delta, sum(${deltaPointSeconds}), dateDiff('millisecond', __first_t, __last_t) / 1000) AS __secs`,
@@ -619,9 +661,9 @@ const histogramBucketsQuery = (ctx: QueryContext, metric: MetricQuery): string =
     runKey(metric.type),
     `any(${isDeltaExpression(metric.type)}) AS __is_delta`,
     'any(ExplicitBounds) AS __point_bounds',
-    `deltaSumTimestamp(toFloat64(Count), ${pointOrder}) AS __count_in`,
     `argMin(toFloat64(Count), ${metricTimeColumn}) AS __first_count`,
     `argMax(toFloat64(Count), ${metricTimeColumn}) AS __last_count`,
+    `if(__last_count >= __first_count, __last_count - __first_count, deltaSumTimestamp(toFloat64(Count), ${pointOrder})) AS __count_in`,
     `argMin(${buckets}, ${metricTimeColumn}) AS __first_b`,
     `argMax(${buckets}, ${metricTimeColumn}) AS __last_b`,
     `sumForEach(${buckets}) AS __sum_b`,
