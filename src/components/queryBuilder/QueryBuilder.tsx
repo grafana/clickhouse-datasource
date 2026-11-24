@@ -8,6 +8,7 @@ import {
   ColumnHint,
   StringFilter,
   TableColumn,
+  TableKeys,
 } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
@@ -37,6 +38,7 @@ import allLabels from 'labels';
 import {
   buildCompactQueryDefaults,
   convertCarriedOverQuery,
+  detectsOtelLogsSchema,
   isCompactQueryTypeMismatch,
   isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
@@ -48,6 +50,7 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
 import { sourceKey } from 'hooks/useFitQueryToTable';
+import useTableKeys from 'hooks/useTableKeys';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
@@ -244,6 +247,8 @@ interface CompactQueryEditorProps {
   onRunQuery?: () => void;
 }
 
+const NO_COLUMNS: readonly TableColumn[] = [];
+
 const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const {
     datasource,
@@ -263,10 +268,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const fallbackTable = isCarriedOver ? '' : builderOptions.table;
   // Defaults are built in two passes: database and table never depend on the
   // table's columns, so a build without column names locates the table for the
-  // columns fetch, and the fetched column names then feed the OTel logs schema
-  // detection inside buildCompactQueryDefaults. Treating a query that still
-  // equals the base defaults as needing initialization lets that detection
-  // correct the defaults once the columns arrive, without clobbering edits:
+  // columns fetch, and the fetched column names and table keys then feed the OTel
+  // logs schema detection inside buildCompactQueryDefaults. Treating a query that
+  // still equals the base defaults as needing initialization lets that detection
+  // correct the defaults once the schema arrives, without clobbering edits:
   // authored queries differ from the generated defaults and are never replaced.
   const baseDefaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable);
   const needsInitialization =
@@ -279,7 +284,15 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const onRunQueryRef = useRef(onRunQuery);
   const locationOptions = needsInitialization ? baseDefaults : builderOptions;
   const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
-  const tableColumnNames = useMemo(() => allColumns.map((column) => column.name), [allColumns]);
+  const detectsLogsSchema = signalType === 'logs' && detectsOtelLogsSchema(datasource);
+  const tableKeys = useTableKeys(
+    datasource,
+    locationOptions.database,
+    needsInitialization && detectsLogsSchema ? locationOptions.table : ''
+  );
+  // Columns stay hidden until the table keys settle, because a query built without the keys is not rebuilt.
+  const schemaColumns = tableKeys === undefined ? NO_COLUMNS : allColumns;
+  const tableColumnNames = useMemo(() => schemaColumns.map((column) => column.name), [schemaColumns]);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
@@ -289,6 +302,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // Converting a carried-over query checks its filters against this table's columns. They are
   // fetched here rather than read from useColumns, which swallows a failed fetch and never
   // settles. A failed fetch converts with no columns, so only fitting role filters are kept.
+  // The table keys load alongside them and share the lookup that useTableKeys starts.
   const { database: targetDatabase, table: targetTable } = baseDefaults;
   useEffect(() => {
     if (!isCarriedOver) {
@@ -296,11 +310,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
 
     let cancelled = false;
-    const convert = (columns: readonly TableColumn[]) => {
+    const convert = (columns: readonly TableColumn[], keys?: TableKeys) => {
       if (cancelled) {
         return;
       }
-      const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns);
+      const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns, keys);
       // The converted query belongs to this data source now.
       const nextOptions = withDatasourceUid(convertCarriedOverQuery(builderOptions, defaults, columns), datasource.uid);
       builderOptionsDispatch(setAllOptions(nextOptions));
@@ -311,13 +325,26 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     };
 
     const columnsRequest = targetTable
-      ? datasource.getColumnsCached(targetDatabase, targetTable)
+      ? datasource.getColumnsCached(targetDatabase, targetTable).catch(() => [])
       : Promise.resolve<TableColumn[]>([]);
-    columnsRequest.then(convert, () => convert([]));
+    const keysRequest =
+      targetTable && detectsLogsSchema
+        ? datasource.fetchTableKeys(targetDatabase, targetTable).catch(() => undefined)
+        : Promise.resolve(undefined);
+    Promise.all([columnsRequest, keysRequest]).then(([columns, keys]) => convert(columns, keys));
     return () => {
       cancelled = true;
     };
-  }, [builderOptions, builderOptionsDispatch, datasource, isCarriedOver, signalType, targetDatabase, targetTable]);
+  }, [
+    builderOptions,
+    builderOptionsDispatch,
+    datasource,
+    detectsLogsSchema,
+    isCarriedOver,
+    signalType,
+    targetDatabase,
+    targetTable,
+  ]);
 
   useEffect(() => {
     if (!needsInitialization || isCarriedOver) {
@@ -335,7 +362,13 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
     lastInitializationKey.current = initializationKey;
 
-    const defaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns);
+    const defaults = buildCompactQueryDefaults(
+      datasource,
+      signalType,
+      fallbackTable,
+      schemaColumns,
+      tableKeys ?? undefined
+    );
     if (!isSameQueryOptions(builderOptions, defaults)) {
       // Keep the recorded owner, so rebuilding the defaults does not drop it.
       const owner = builderOptions.meta?.datasourceUid;
@@ -352,11 +385,12 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     needsInitialization,
     signalType,
     tableColumnNames,
-    allColumns,
+    schemaColumns,
+    tableKeys,
   ]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns)
+    ? buildCompactQueryDefaults(datasource, signalType, fallbackTable, schemaColumns, tableKeys ?? undefined)
     : builderOptions;
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 

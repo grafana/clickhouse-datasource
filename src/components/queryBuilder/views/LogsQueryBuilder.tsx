@@ -118,7 +118,15 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   }, builderState);
 
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch, allColumns);
-  useOtelColumns(datasource, allColumns, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useOtelColumns(
+    datasource,
+    allColumns,
+    builderState.otelEnabled,
+    builderState.otelVersion,
+    builderOptionsDispatch,
+    builderOptions.database,
+    builderOptions.table
+  );
   useBackfillLogColumnTypes(allColumns, builderOptions.columns, builderOptionsDispatch);
   useDefaultTimeColumn(
     datasource,
