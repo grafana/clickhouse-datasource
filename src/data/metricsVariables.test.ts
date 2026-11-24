@@ -77,14 +77,15 @@ describe('getMetricFilterSql', () => {
     );
   });
 
-  it('keeps plain filters and other operators as builder filters', () => {
+  it('quotes a plain value and keeps other operators as builder filters', () => {
     const filters: Filter[] = [
       toMetricLabelFilter(route, FilterOperator.Equals, '/cart'),
       toMetricLabelFilter(route, FilterOperator.Like, '$route'),
       toMetricLabelFilter(service, FilterOperator.Equals, '$service'),
     ];
+    // LIKE wraps its own value, so it stays a builder filter and is grouped before the label filters.
     expect(getMetricFilterSql(filters)).toBe(
-      "(( Attributes['http.route'] = '/cart' ) AND ( Attributes['http.route'] LIKE '%$route%' )) AND " +
+      "(( Attributes['http.route'] LIKE '%$route%' )) AND (Attributes['http.route'] = '/cart') AND " +
         '($__conditionalAll("ServiceName" IN (${service:singlequote}), $service))'
     );
     expect(getMetricFilterSql([])).toBe('');
