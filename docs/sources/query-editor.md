@@ -208,6 +208,8 @@ GROUP BY machine_group, log_time
 ORDER BY log_time
 ```
 
+The plugin converts this result into one series for each group. The converted result has one cell for each distinct timestamp in each series, and its size has no limit by default. An administrator can set a limit in cells with `long_to_wide_cell_limit` in the `[plugin.grafana-clickhouse-datasource]` section of the Grafana configuration. A value of 0 removes the limit. When a converted result passes the limit, the query fails with an error that asks you to add filters or aggregation. To stay under the limit, bucket the time column with `$__timeInterval` or reduce the number of groups.
+
 ## Tables
 
 Table visualizations are available for any valid ClickHouse query. Select **Table** in the panel visualization options to view results in tabular form.
