@@ -76,6 +76,8 @@ type LogsConfig struct {
 	ContextColumns       []string `json:"contextColumns,omitempty"`
 	AdditionalColumns    []string `json:"additionalColumns,omitempty"`
 	ShowLogLinks         bool     `json:"showLogLinks,omitempty"`
+
+	TraceLinkDatasourceUID string `json:"traceLinkDatasourceUid,omitempty"`
 }
 
 // TracesConfig backs the jsonData.traces nested object.

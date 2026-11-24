@@ -139,6 +139,7 @@ export const ConfigurationModeSection = (props: Props) => {
               onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
               onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
               onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
+              onTraceLinkDatasourceUidChange={(uid) => onLogsConfigChange('traceLinkDatasourceUid', uid)}
               onAdditionalColumnsChange={(c) => onUpdateLogsConfig('additionalColumns', c)}
               onAttributeColumnsChange={(c) => onUpdateLogsConfig('attributeColumns', c)}
               onAttributeColumnExclusionsChange={(c) => onUpdateLogsConfig('attributeColumnExclusions', c)}
