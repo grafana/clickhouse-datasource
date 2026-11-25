@@ -710,7 +710,7 @@ export class Datasource
       const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
 
       // Apply $__adHocFilters macro before automatic filter application
-      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON);
+      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON, tableQualifiedKeys);
 
       // Only apply automatic filters if the macro was not used
       if (!hasMacro) {
@@ -798,7 +798,12 @@ export class Datasource
     return rawQuery;
   }
 
-  applyAdHocFiltersMacro(rawQuery: string, filters: AdHocVariableFilter[], useJSON = false): string {
+  applyAdHocFiltersMacro(
+    rawQuery: string,
+    filters: AdHocVariableFilter[],
+    useJSON = false,
+    tableQualifiedKeys = true
+  ): string {
     if (!rawQuery) {
       return rawQuery;
     }
@@ -820,7 +825,7 @@ export class Datasource
         return match; // Return original if no valid table names found
       }
 
-      const filterStr = this.adHocFilter.buildFilterString(filters, useJSON);
+      const filterStr = this.adHocFilter.buildFilterString(filters, useJSON, undefined, tableQualifiedKeys);
       if (filterStr === '') {
         return 'additional_table_filters={}';
       }
