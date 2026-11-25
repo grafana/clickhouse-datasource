@@ -344,6 +344,7 @@ describe('AdHocManager', () => {
     ['several line comments', 'SELECT count() FROM default.tbl;\n-- a\n-- b'],
     ['a # comment', 'SELECT count() FROM default.tbl; # note'],
     ['a second semicolon', 'SELECT count() FROM default.tbl;;'],
+    ['a byte order mark', 'SELECT count() FROM default.tbl;\uFEFF'],
   ])('strips a trailing semicolon followed by %s', (_label, sql) => {
     const ahm = new AdHocFilter();
     const val = ahm.apply(sql, [{ key: 'k', operator: '=', value: 'v' }] as AdHocVariableFilter[]);
@@ -936,5 +937,14 @@ describe('AdHocManager', () => {
       expect(ahm.buildFilterString(filters, false, 'logs.web')).toEqual(" client_asn > \\'0\\' AND host = \\'x\\' ");
       expect(ahm.buildFilterString(filters)).toEqual(" client_asn > \\'0\\' AND host = \\'x\\' ");
     });
+  });
+
+  it('keys the filter to the table under a chain of CTEs', () => {
+    const sql =
+      'WITH per_series AS (SELECT t, v FROM otel_metrics_histogram), lagged AS (SELECT t, v FROM per_series) SELECT t FROM lagged';
+    const val = new AdHocFilter().apply(sql, [
+      { key: 'ServiceName', operator: '=', value: 'api' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toContain("additional_table_filters={'otel_metrics_histogram' : ' ServiceName = \\'api\\' '}");
   });
 });

@@ -9,6 +9,16 @@ describe('ast', () => {
     });
   });
   describe('sqlToStatement', () => {
+    it('reads the names and variables inside a macro call back as written', () => {
+      const stm = sqlToStatement(
+        'SELECT Body FROM t WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)'
+      );
+      const where = JSON.stringify(stm.type === 'select' ? stm.where : undefined);
+      expect(where).toContain('"name":"ServiceName"');
+      expect(where).toContain('"name":"${service:singlequote}"');
+      expect(where).toContain('"name":"$service"');
+    });
+
     it('settings parse correctly', () => {
       const sql = 'SELECT count(*) FROM foo SETTINGS setting1=stuff setting2=stuff';
       const stm = sqlToStatement(sql);
@@ -165,6 +175,7 @@ describe('ast', () => {
       ],
       ['a double-quoted qualified name', 'SELECT * FROM "default"."otel_logs"', 'default.otel_logs'],
       ['a mixed backtick-quoted name', 'SELECT * FROM db.`weird-table`', 'db.weird-table'],
+      ['a zero-width space before the table name', 'SELECT * FROM\u200Botel_logs', 'otel_logs'],
       ['an EXCEPT column modifier (not a set operation)', 'SELECT * EXCEPT (secret) FROM otel_logs', 'otel_logs'],
       [
         'an EXCEPT modifier on a COLUMNS matcher',
@@ -199,6 +210,15 @@ describe('ast', () => {
         'WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM t_b) SELECT * FROM b',
         't_b',
       ],
+      ['a CTE that reads another CTE', 'WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM a) SELECT * FROM b', 't_a'],
+      [
+        'a chain of three CTEs, as OTel metrics queries are written',
+        'WITH per_series AS (SELECT t, v FROM otel.otel_metrics_histogram), lagged AS (SELECT t, v FROM per_series) SELECT t FROM lagged',
+        'otel.otel_metrics_histogram',
+      ],
+      ['a FROM subquery that reads a CTE', 'WITH a AS (SELECT * FROM t_a) SELECT * FROM (SELECT * FROM a)', 't_a'],
+      ['a CTE whose body names itself', 'WITH a AS (SELECT * FROM a) SELECT * FROM a', 'a'],
+      ['two CTEs that name each other', 'WITH a AS (SELECT * FROM b), b AS (SELECT * FROM a) SELECT * FROM a', 'a'],
     ])('resolves the table for %s', (_label, sql, expected) => {
       expect(getTable(sql)).toBe(expected);
     });

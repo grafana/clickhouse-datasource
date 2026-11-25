@@ -72,7 +72,9 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
 
   // just extend sql for now so we get syntax highlighting
   const completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [' ', '.', '$'],
+    // Not a space: Enter accepts the selected suggestion, so a list that opens on a space turns Enter
+    // after `FROM t ` into a suggestion instead of a new line. Typing a letter opens the list anyway.
+    triggerCharacters: ['.', '$'],
     provideCompletionItems: async (model: Model, position: Position) => {
       const word = model.getWordUntilPosition(position);
       const range: Range = {

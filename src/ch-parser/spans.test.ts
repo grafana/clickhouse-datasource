@@ -438,6 +438,9 @@ describe('scanTopLevelSelect', () => {
         ['UNION DISTINCT', 'SELECT a FROM t UNION DISTINCT SELECT a FROM u'],
         ['EXCEPT', 'SELECT a FROM t EXCEPT SELECT a FROM u'],
         ['INTERSECT', 'SELECT a FROM t INTERSECT SELECT a FROM u'],
+        ['EXCEPT before a parenthesized select', 'SELECT a FROM t EXCEPT (SELECT a FROM u)'],
+        ['INTERSECT after GROUP BY', 'SELECT a FROM t GROUP BY a INTERSECT SELECT a FROM u'],
+        ['EXCEPT with no FROM before it', 'SELECT 1 EXCEPT SELECT a FROM u'],
       ])('reports %s', (_name, sql) => {
         expect(scanProblem(sql)).toBe(SelectShapeProblem.SetOperation);
       });
@@ -684,6 +687,19 @@ describe('EXCEPT disambiguation', () => {
 
   it('treats EXCEPT after the FROM as a set operation', () => {
     expect(scanProblem('SELECT a FROM t EXCEPT SELECT a FROM u')).toBe(SelectShapeProblem.SetOperation);
+  });
+});
+
+describe('set operator keywords used as names', () => {
+  // ClickHouse accepts `union`, `intersect` and `except` as unquoted names, so they only
+  // count as set operators when another select follows.
+  it.each([
+    ['a column named except', 'SELECT Timestamp, Body FROM t WHERE except = 2'],
+    ['a column named union', 'SELECT Timestamp, union FROM t'],
+    ['a column named intersect', 'SELECT Timestamp, intersect FROM t'],
+    ['a table alias named union', 'SELECT Timestamp FROM t AS union'],
+  ])('does not treat %s as a set operation', (_label, sql) => {
+    expect(scanProblem(sql)).toBeUndefined();
   });
 });
 

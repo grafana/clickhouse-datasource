@@ -1,4 +1,4 @@
-import { parseFirst, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
+import { parse, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
 import { FromQueryNode, parseSelect, SelectQueryNode } from 'ch-parser/parser';
 
 interface ReplacePart {
@@ -73,6 +73,24 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
  */
 const MS_BOUND_SUFFIX = /(\$__toTime_ms)\s*\+\s*INTERVAL\s+1\s+MILLISECOND/gi;
 
+/**
+ * The name at `node` as `sql` spells it. pgsql-ast-parser folds an unquoted name to lower case, as
+ * Postgres does, but ClickHouse names are case-sensitive, so `Timestamp` has to stay `Timestamp`.
+ * A quoted name is already kept as written.
+ */
+function writtenName(sql: string, node: { _location?: { start: number; end: number } }, folded: string): string {
+  if (!node._location) {
+    return folded;
+  }
+  const text = sql.substring(node._location.start, node._location.end);
+  if (text.endsWith('"')) {
+    return folded;
+  }
+  // A qualified name (`l.ServiceName`) ends with the name itself.
+  const name = text.substring(text.lastIndexOf('.') + 1);
+  return name.toLowerCase() === folded ? name : folded;
+}
+
 export function sqlToStatement(rawSql: string): Statement {
   const [replaceVars, variableSql] = replaceMacroVariables(rawSql.replace(MS_BOUND_SUFFIX, '$1'));
   const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
@@ -80,7 +98,8 @@ export function sqlToStatement(rawSql: string): Statement {
 
   let ast: Statement;
   try {
-    ast = parseFirst(sql);
+    // Locations let the mapper below read each name back as written.
+    ast = parse(sql, { locationTracking: true })[0];
   } catch (err) {
     console.error(`Failed to parse SQL statement into an AST: ${err}`);
     return {} as Statement;
@@ -104,7 +123,14 @@ export function sqlToStatement(rawSql: string): Statement {
         const d = r.name.replace(rf.replacementName, rf.name);
         return { ...r, name: d };
       }
-      return map.super().ref(r);
+      return map.super().ref({ ...r, name: writtenName(sql, r, r.name) });
+    },
+    selectionColumn: (c) => {
+      const column = map.super().selectionColumn(c);
+      if (!column?.alias || !c.alias) {
+        return column;
+      }
+      return { ...column, alias: { ...column.alias, name: writtenName(sql, c.alias, column.alias.name) } };
     },
     expr: (e) => {
       if (!e || e.type !== 'string') {
@@ -120,11 +146,14 @@ export function sqlToStatement(rawSql: string): Statement {
       return map.super().expr(e);
     },
     call: (c) => {
+      // Map the arguments first, so the names inside a macro call keep their case too, as in
+      // `$__timeFilter(Timestamp)` or `$__timeInterval(Timestamp)`.
+      const call = map.super().call(c);
       const rf = replaceParts.find((x) => c.function.name.startsWith(x.replacementName));
-      if (rf) {
-        return { ...c, function: { ...c.function, name: c.function.name.replace(rf.replacementName, rf.name) } };
+      if (!rf || call?.type !== 'call') {
+        return call;
       }
-      return map.super().call(c);
+      return { ...call, function: { ...call.function, name: call.function.name.replace(rf.replacementName, rf.name) } };
     },
   }));
   return mapper.statement(ast)!;
@@ -149,9 +178,14 @@ function qualifiedTableName(node: FromQueryNode): string | undefined {
 // FROM is a subquery it descends into that subquery, and only that subquery, so
 // a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
 // for the target. A FROM that references a CTE resolves to the CTE's underlying
-// table. A table-function FROM, or a top-level set operation, resolves to
-// undefined.
-function firstPhysicalTable(node: SelectQueryNode): string | undefined {
+// table, also when the CTE is defined at an outer level: a CTE that reads
+// another CTE, or a FROM subquery that reads one. A table-function FROM, or a
+// top-level set operation, resolves to undefined.
+function firstPhysicalTable(
+  node: SelectQueryNode,
+  outerScope: Map<string, SelectQueryNode> = new Map(),
+  resolving: Set<SelectQueryNode> = new Set()
+): string | undefined {
   // A top-level UNION / INTERSECT / EXCEPT combines several tables; single-table
   // targeting is not meaningful, so resolve to no table. Per-branch keying is a
   // follow-up.
@@ -162,12 +196,16 @@ function firstPhysicalTable(node: SelectQueryNode): string | undefined {
   if (!from) {
     return undefined;
   }
-  // An unqualified FROM target that names a CTE defined at this level resolves
-  // to the CTE body's table, not the alias (which ClickHouse would ignore).
+  // The CTEs visible at this level; one defined here hides an outer one with the same name.
+  const scope = new Map([...outerScope, ...(node.withAliases ?? [])]);
+  // An unqualified FROM target that names a visible CTE resolves to the CTE
+  // body's table, not the alias (which ClickHouse would ignore). A CTE that is
+  // already being resolved names a physical table instead, which also stops
+  // CTEs that read themselves or each other.
   if (from.table && !from.database && !from.isTableFunction) {
-    const cteBody = node.withAliases?.get(from.table);
-    if (cteBody) {
-      return firstPhysicalTable(cteBody);
+    const cteBody = scope.get(from.table);
+    if (cteBody && !resolving.has(cteBody)) {
+      return firstPhysicalTable(cteBody, scope, new Set([...resolving, cteBody]));
     }
   }
   const name = qualifiedTableName(from);
@@ -175,7 +213,7 @@ function firstPhysicalTable(node: SelectQueryNode): string | undefined {
     return name;
   }
   if (from.subquery) {
-    return firstPhysicalTable(from.subquery);
+    return firstPhysicalTable(from.subquery, scope, resolving);
   }
   return undefined;
 }
