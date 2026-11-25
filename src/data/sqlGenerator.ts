@@ -715,7 +715,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
   }
 
   if (col.alias && col.alias !== col.name && escapeIdentifier(col.alias) !== colName) {
-    return `${colName} as "${col.alias}"`;
+    return `${colName} as ${escapeIdentifier(col.alias)}`;
   }
 
   return colName;
