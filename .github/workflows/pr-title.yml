@@ -7,6 +7,7 @@ on:
       - edited
       - synchronize
       - reopened
+  merge_group:
 
 permissions:
   contents: read
@@ -18,6 +19,8 @@ concurrency:
 jobs:
   check-title:
     name: Validate Conventional Commits format
+    # A skipped job satisfies the required check in merge groups.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
