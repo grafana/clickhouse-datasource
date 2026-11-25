@@ -792,7 +792,7 @@ export class Datasource
           phrase = '1=1';
         }
       }
-      rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, phrase);
+      rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, () => phrase);
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
