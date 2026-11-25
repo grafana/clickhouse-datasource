@@ -19,12 +19,6 @@
       "allowedVersions": "<13.2.0"
     },
     {
-      "description": "@grafana/eslint-config 10+ needs eslint-plugin-react-hooks >=7.1.0, which we have not adopted yet",
-      "matchDatasources": ["npm"],
-      "matchPackageNames": ["@grafana/eslint-config"],
-      "allowedVersions": "<10.0.0"
-    },
-    {
       "description": "Use chore(deps) for all updates so release-please keeps dependency bumps out of the changelog",
       "matchPackageNames": ["*"],
       "semanticCommitType": "chore"

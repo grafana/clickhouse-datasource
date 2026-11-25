@@ -34,4 +34,14 @@ export default defineConfig([
     ],
   },
   ...baseConfig,
+  {
+    // eslint-plugin-react-hooks 7 adds React Compiler rules that flag the existing prop-to-state
+    // syncing and render-time ref tracking. Warn until those call sites are refactored, so the
+    // dependency bump itself changes no behaviour.
+    rules: {
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/immutability': 'warn',
+    },
+  },
 ]);
