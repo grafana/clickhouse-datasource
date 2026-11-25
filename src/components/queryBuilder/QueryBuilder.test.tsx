@@ -17,6 +17,7 @@ import { setColumnByHint, setTable, useBuilderOptionsState } from 'hooks/useBuil
 import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
 import { selectors } from 'selectors';
+import { NO_LOG_COLUMNS_NOTICE_DELAY_MS } from './NoLogColumnsNotice';
 
 jest.mock('./views/TableQueryBuilder', () => ({
   TableQueryBuilder: () => <div data-testid="table-component" />,
@@ -541,7 +542,8 @@ describe('QueryBuilder', () => {
     renderCompactWithRealReducer(datasource);
     await waitFor(() => expect(datasource.fetchColumns).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByTestId('compact-mode-bar')).toBeInTheDocument());
-    await new Promise((r) => setTimeout(r, 50));
+    // Wait past the notice delay so a notice that wrongly appears would be caught.
+    await new Promise((r) => setTimeout(r, NO_LOG_COLUMNS_NOTICE_DELAY_MS + 100));
     expect(screen.queryByTestId('logs-no-columns-notice')).not.toBeInTheDocument();
   });
 

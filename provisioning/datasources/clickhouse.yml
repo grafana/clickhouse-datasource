@@ -9,6 +9,28 @@ deleteDatasources:
     orgId: 1
   - name: ClickHouse Single Logs
     orgId: 1
+  - name: ClickHouse Single Logs No Columns
+    uid: clickhouse-e2e-single-logs-no-columns
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: clickhouse-server
+    orgId: 1
+    jsonData:
+      host: clickhouse-server
+      database: 'e2e_test'
+      username: 'default'
+      port: 9000
+      protocol: native
+      configMode: single-table
+      signalType: logs
+      # No role columns are configured and the table has none that resolve by name, so the
+      # logs builder has nothing to select (tests/e2e/editor/compactMode.spec.ts).
+      logs:
+        defaultDatabase: 'e2e_test'
+        defaultTable: 'logs_no_columns'
+        otelEnabled: false
+    secureJsonData:
+      # password: ""
   - name: ClickHouse Single Traces
     orgId: 1
 
