@@ -26,6 +26,11 @@ describe('ast', () => {
       expect(toSql.statement(stm)).toEqual('SELECT (count (*) )  FROM foo');
     });
 
+    it('keeps names that contain the default or settings keywords', () => {
+      const stm = sqlToStatement('SELECT is_default FROM user_settings WHERE enabled = 1');
+      expect(toSql.statement(stm)).toEqual('SELECT is_default  FROM user_settings   WHERE (enabled = (1))');
+    });
+
     // https://github.com/grafana/clickhouse-datasource/issues/714
     it('does not error when brackets/macros/variables are present', () => {
       const errLog = jest.spyOn(console, 'error');

@@ -18,8 +18,9 @@ function getReplacementKey(isVariable: boolean) {
  */
 function replaceMacroFunctions(sql: string): [ReplaceParts, string] {
   const replaceFuncs: ReplaceParts = [];
-  // default is a keyword in this grammar, but it can be used in CH
-  const keywordRegex = /(\$__|\$|default|settings)/gi;
+  // default is a keyword in this grammar, but it can be used in CH. Match the keywords as whole words so
+  // a name that merely contains one (`is_default`, `user_settings`) is left alone.
+  const keywordRegex = /(\$__|\$|\bdefault\b|\bsettings\b)/gi;
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = keywordRegex.exec(sql)) !== null) {
     replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
