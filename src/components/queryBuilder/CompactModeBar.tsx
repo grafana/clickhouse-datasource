@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Icon, Input, useStyles2 } from '@grafana/ui';
@@ -33,10 +33,11 @@ export const CompactModeBar = (props: CompactModeBarProps) => {
   const { mode, searchText, onSearchChange } = props;
   const styles = useStyles2(getStyles);
   const [localSearch, setLocalSearch] = useState(searchText);
-
-  useEffect(() => {
+  const [prevSearchText, setPrevSearchText] = useState(searchText);
+  if (searchText !== prevSearchText) {
+    setPrevSearchText(searchText);
     setLocalSearch(searchText);
-  }, [searchText]);
+  }
 
   if (mode === 'otel-traces') {
     return null;

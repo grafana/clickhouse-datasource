@@ -61,25 +61,36 @@ export const ServerAndEncryptionSection = (props: Props) => {
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    // Always clear errors eagerly when the user fills in a field, regardless of
-    // whether the ValidationAPI is available. Whitespace-only is treated as
-    // empty so the user gets a clear field-level error instead of a
-    // confusing connection failure later.
-    if (jsonData.host?.trim()) {
+  // Always clear errors eagerly when the user fills in a field, regardless of
+  // whether the ValidationAPI is available. Whitespace-only is treated as
+  // empty so the user gets a clear field-level error instead of a
+  // confusing connection failure later.
+  const [prevHost, setPrevHost] = useState(jsonData.host);
+  const [prevPort, setPrevPort] = useState(jsonData.port);
+  if (jsonData.host !== prevHost || jsonData.port !== prevPort) {
+    setPrevHost(jsonData.host);
+    setPrevPort(jsonData.port);
+    const clearHost = jsonData.host !== prevHost && Boolean(jsonData.host?.trim());
+    const clearPort = jsonData.port !== prevPort && Boolean(jsonData.port);
+    if (clearHost || clearPort) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        delete next.host;
+        if (clearHost) {
+          delete next.host;
+        }
+        if (clearPort) {
+          delete next.port;
+        }
         return next;
       });
+    }
+  }
+
+  useEffect(() => {
+    if (jsonData.host?.trim()) {
       validation?.clearError('host');
     }
     if (jsonData.port) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.port;
-        return next;
-      });
       validation?.clearError('port');
     }
     if (!validation) {
