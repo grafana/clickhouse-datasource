@@ -334,7 +334,8 @@ function escapeKey(
   }
 
   // Default: bare column, or `table.col` reference where col isn't a Map.
-  // Strip the leading table prefix if present.
+  // The leading table prefix is stripped only when keys are table-qualified;
+  // otherwise the dots belong to the column name.
   return safeColumnRef(tableQualified && s.includes('.') ? s.split('.').slice(1).join('.') : s);
 }
 

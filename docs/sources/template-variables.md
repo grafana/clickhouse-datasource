@@ -238,7 +238,7 @@ Ad hoc filters support the following operators:
 
 By default, ad hoc filter keys are shown as `table.column`, and a filter applies only to queries that read from that table. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. Filters then apply to every query, so use this option when all queries target the same table.
 
-With the option enabled, a key is read as a column name, dots included: `k8s.cluster.name` filters the column named `k8s.cluster.name`. A filter saved as `table.column` before you enabled the option no longer matches a column, so remove it and add the filter again.
+With the option enabled, a key is read as a column name, dots included: `k8s.cluster.name` filters the column named `k8s.cluster.name`. The exception is a key that starts with a Map column: `ResourceAttributes.k8s.cluster.name` still filters the `k8s.cluster.name` key of the `ResourceAttributes` Map, as described in [Map and JSON types](#map-and-json-types-opentelemetry). A filter saved as `table.column` before you enabled the option no longer matches a column, so remove it and add the filter again.
 
 ## Map and JSON types (OpenTelemetry)
 
