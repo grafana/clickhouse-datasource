@@ -42,12 +42,23 @@ export type Fetcher = {
   (text: string, range: Range, cursorPosition: number): Promise<SuggestionResponse>;
 };
 
-// Tokens the formatter keeps exactly as typed, so template syntax inside them is left alone.
+// Tokens that reach the formatter without placeholders, even when they hold template syntax.
 const verbatimTokenTypes = new Set([TokenType.Comment, TokenType.StringLiteral, TokenType.QuotedIdentifier]);
 
 // A word holding Grafana template syntax: a macro ($__timeFilter), a variable ($var, ${var},
-// ${var:singlequote}) or a name built from them (otel_${env}_logs).
-const templateWordRegex = /(?:\w|\$\{[^}]*\}|\$)+/g;
+// ${var:singlequote}, [[var]], [[var:csv]]) or a name built from them (otel_${env}_logs).
+const templateWordRegex = /(?:\w|\$\{[^}]*\}|\$|\[\[\w+(?::\w+)?\]\])+/g;
+
+// The formatter reads a hex or binary string (x'4142', b'0101') as a name followed by a string,
+// and puts a space between them, so these strings get placeholders like here-documents.
+const hexOrBinaryStringRegex = /^[xb]'/i;
+
+// ClickHouse nests block comments, and so does the plugin's lexer: `/* a /* b */ c */` is one
+// comment token, so a block comment that holds another `/*` nests. The formatter ends a block
+// comment at the first `*/` instead, which turns the end of this one into `c * /`. It doesn't
+// read `//` as a comment either.
+const formatterBreaksComment = (comment: string): boolean =>
+  comment.startsWith('//') || (comment.startsWith('/*') && comment.includes('/*', 2));
 
 interface TemplateProtection {
   sql: string;
@@ -55,8 +66,9 @@ interface TemplateProtection {
 }
 
 /**
- * Swaps Grafana template syntax and here-documents for placeholder identifiers, so the formatter
- * only sees ClickHouse SQL it can parse. Returns undefined when the query does not tokenize.
+ * Swaps Grafana template syntax, here-documents and other ClickHouse syntax the formatter misreads
+ * for placeholder identifiers, so the formatter only sees ClickHouse SQL it can parse. Returns
+ * undefined when the query does not tokenize or has a comment the formatter would break.
  */
 function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
   let prefix = 'grafana_template_';
@@ -76,7 +88,7 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
   let code = '';
   const flushCode = () => {
     sql += code.replace(templateWordRegex, (word: string, offset: number) =>
-      word.includes('$') ? placeholder(word, code[offset + word.length] === '(') : word
+      word.includes('$') || word.includes('[[') ? placeholder(word, code[offset + word.length] === '(') : word
     );
     code = '';
   };
@@ -86,11 +98,12 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
   // A `^` or `:` right after a dot, held until the name or type that follows it.
   let pathPart: string | undefined;
   for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
-    if (token.isError()) {
+    // The token as typed. The lexer starts a line comment token after its `--`, `#` or `//`.
+    const text = rawSql.substring(pos, token.end);
+    if (token.isError() || (token.type === TokenType.Comment && formatterBreaksComment(text))) {
       return undefined;
     }
 
-    const text = rawSql.substring(pos, token.end);
     pos = token.end;
     if (pathPart !== undefined) {
       const held = pathPart;
@@ -106,7 +119,10 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
       pathPart = text;
       continue;
     }
-    if (token.type === TokenType.HereDoc) {
+    if (
+      token.type === TokenType.HereDoc ||
+      (token.type === TokenType.StringLiteral && hexOrBinaryStringRegex.test(text))
+    ) {
       flushCode();
       sql += placeholder(text, false);
     } else if (verbatimTokenTypes.has(token.type)) {

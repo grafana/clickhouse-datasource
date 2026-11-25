@@ -20,12 +20,10 @@ describe('SQL Formatter', () => {
 
   it('keeps template variables with a format option intact', () => {
     const input = 'SELECT t FROM x WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)';
+    const expected =
+      'SELECT\n  t\nFROM\n  x\nWHERE\n  $__conditionalAll(\n    ServiceName IN (${service:singlequote}),\n    $service\n  )';
 
-    const actual = formatSql(input, 2);
-    expect(actual).toContain('$__conditionalAll(');
-    expect(actual).toContain('ServiceName IN (${service:singlequote})');
-    expect(actual).toContain('$service');
-    expect(actual).not.toContain('$ {');
+    expect(formatSql(input, 2)).toBe(expected);
   });
 
   it('formats queries with backtick-quoted columns', () => {
@@ -43,13 +41,19 @@ describe('SQL Formatter', () => {
     expect(formatSql(input, 2)).toBe(expected);
   });
 
+  it('keeps bracket variables intact', () => {
+    const input = 'SELECT * FROM otel_[[env]]_logs WHERE a IN ([[v:csv]]) AND b = [[w]]';
+    const expected = 'SELECT\n  *\nFROM\n  otel_[[env]]_logs\nWHERE\n  a IN ([[v:csv]])\n  AND b = [[w]]';
+
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
   it('leaves template syntax inside strings and comments alone', () => {
     const input = "-- $__timeFilter(x) in a comment\nSELECT a /* ${v} */ FROM t WHERE ServiceName = '${service}'";
+    const expected =
+      "-- $__timeFilter(x) in a comment\nSELECT\n  a /* ${v} */\nFROM\n  t\nWHERE\n  ServiceName = '${service}'";
 
-    const actual = formatSql(input, 2);
-    expect(actual).toContain('-- $__timeFilter(x) in a comment');
-    expect(actual).toContain('/* ${v} */');
-    expect(actual).toContain("ServiceName = '${service}'");
+    expect(formatSql(input, 2)).toBe(expected);
   });
 
   it('formats ClickHouse syntax', () => {
@@ -72,14 +76,32 @@ describe('SQL Formatter', () => {
 
   it('keeps here-documents as typed', () => {
     const input = "SELECT $$it's a heredoc$$ AS s, $doc$tagged 'one'$doc$ AS t";
+    const expected = "SELECT\n  $$it's a heredoc$$ AS s,\n  $doc$tagged 'one'$doc$ AS t";
 
-    const actual = formatSql(input, 2);
-    expect(actual).toContain("$$it's a heredoc$$ AS s");
-    expect(actual).toContain("$doc$tagged 'one'$doc$ AS t");
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
+  it('keeps hex and binary strings whole', () => {
+    const input = "SELECT x'4142' AS h, b'01000001' AS b FROM t WHERE c = X'43'";
+    const expected = "SELECT\n  x'4142' AS h,\n  b'01000001' AS b\nFROM\n  t\nWHERE\n  c = X'43'";
+
+    expect(formatSql(input, 2)).toBe(expected);
   });
 
   it('returns a query it cannot format unchanged', () => {
     const input = "SELECT 'unterminated FROM t";
+
+    expect(formatSql(input, 2)).toBe(input);
+  });
+
+  it('returns a query with a nested block comment unchanged', () => {
+    const input = 'SELECT a /* x /* y */ z */ FROM t WHERE $__timeFilter(ts)';
+
+    expect(formatSql(input, 2)).toBe(input);
+  });
+
+  it('returns a query with a // comment unchanged', () => {
+    const input = 'SELECT a // why\nFROM t WHERE $__timeFilter(ts)';
 
     expect(formatSql(input, 2)).toBe(input);
   });
@@ -93,8 +115,9 @@ describe('SQL Formatter', () => {
 
   it('only joins the bracket to a macro when it was joined in the query', () => {
     const input = 'SELECT 1 FROM t WHERE $__timeFilter (ts)';
+    const expected = 'SELECT\n  1\nFROM\n  t\nWHERE\n  $__timeFilter (ts)';
 
-    expect(formatSql(input, 2)).toContain('$__timeFilter (ts)');
+    expect(formatSql(input, 2)).toBe(expected);
   });
 });
 
