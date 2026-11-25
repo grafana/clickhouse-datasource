@@ -307,6 +307,32 @@ describe('Inserting a Grafana variable', () => {
   ])('inserts only what is missing when %s', async (_label, sql, insertText) => {
     expect(await inserted(sql)).toMatchObject({ insertText, filterText: 'table' });
   });
+
+  // What the query reads after picking `${table}` at `|`. Monaco replaces the word typed before the
+  // cursor, which stops at `$` and `{`, and keeps the text after the cursor.
+  const afterPicking = async (sql: string) => {
+    const [before, after] = sql.split('|');
+    const { insertText } = (await inserted(sql))!;
+    return before.replace(/\w*$/, () => insertText) + after;
+  };
+
+  it.each([
+    ['after `$`', 'SELECT * FROM otel_logs WHERE x = $|', 'SELECT * FROM otel_logs WHERE x = ${table}'],
+    ['after `${`', 'SELECT * FROM ${|', 'SELECT * FROM ${table}'],
+    ['after `${` with the brace the editor closed', 'SELECT * FROM ${|}', 'SELECT * FROM ${table}'],
+    [
+      'after `$` in a map, keeping the map brace',
+      "SELECT * FROM otel_logs WHERE x = {'a': $|}",
+      "SELECT * FROM otel_logs WHERE x = {'a': ${table}}",
+    ],
+    [
+      'after `${` in a map, with the brace the editor closed',
+      "SELECT * FROM otel_logs WHERE x = {'a': ${|}}",
+      "SELECT * FROM otel_logs WHERE x = {'a': ${table}}",
+    ],
+  ])('closes the variable once %s', async (_label, sql, result) => {
+    expect(await afterPicking(sql)).toBe(result);
+  });
 });
 
 describe('Suggestions for JOIN targets and set operations', () => {

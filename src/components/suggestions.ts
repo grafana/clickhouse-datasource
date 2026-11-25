@@ -158,7 +158,8 @@ export async function getSuggestions(
 /**
  * How much of a variable reference is typed before the name at the cursor: '$', '${', or nothing.
  * Monaco treats `$` and `{` as word separators, so they stay in place and the suggestion replaces
- * only the name typed after them. A `}` right after the cursor was closed by the editor.
+ * only the name typed after them. `closed` is whether a `}` comes right after the cursor, which
+ * closes the variable only after `${`.
  */
 export interface TypedVariableStart {
   start: '' | '$' | '${';
@@ -403,7 +404,9 @@ export function getVariableSuggestions(range: Range, typed: TypedVariableStart =
     const label = `\${${variable.name}}`;
     const val = templateSrv.replace(label);
     // Only what is not typed yet, so picking `${service}` after `$` doesn't give `$${service}`.
-    const closing = typed.closed ? '' : '}';
+    // After a bare `$` a `}` at the cursor closes something else, as in `{'a': $}`, so the insert
+    // brings its own. After `${` it is the one the editor added when `{` was typed.
+    const closing = typed.start === '${' && typed.closed ? '' : '}';
     const insertText =
       typed.start === '${' ? `${variable.name}${closing}` : typed.start === '$' ? `{${variable.name}${closing}` : label;
     return {
