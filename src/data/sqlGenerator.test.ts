@@ -466,6 +466,38 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
+  it('escapes quotes in the trace ID', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+      ],
+      filters: [],
+      meta: { isTraceIdMode: true, traceId: "abc' OR 1=1 --" },
+    };
+
+    expect(generateSql(opts)).toContain(`WHERE traceID = 'abc\\' OR 1=1 --'`);
+  });
+
+  it('escapes quotes in the log message search text', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      filters: [],
+      meta: { logMessageLike: "can't connect" },
+    };
+
+    expect(generateSql(opts)).toContain(`LIKE '%can\\'t connect%'`);
+  });
+
   it('generates trace ID query with JSON-typed tags columns', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
@@ -1454,6 +1486,39 @@ describe('getFilters', () => {
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
     expect(sql).toEqual(`( ResourceAttributes['service.name'] = 'my-service' )`);
+  });
+
+  it('escapes quotes in a Map key', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'ResourceAttributes',
+          mapKey: "it's",
+          operator: FilterOperator.Equals,
+          type: 'Map(String, String)',
+          value: 'x',
+        },
+      ],
+    } as QueryBuilderOptions;
+    expect(_testExports.getFilters(options)).toEqual(`( ResourceAttributes['it\\'s'] = 'x' )`);
+  });
+
+  it('escapes quotes and backslashes in a LIKE value but keeps its wildcards', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'body',
+          operator: FilterOperator.Like,
+          type: 'String',
+          value: "can't a_b\\",
+        },
+      ],
+    } as QueryBuilderOptions;
+    expect(_testExports.getFilters(options)).toEqual(`( body LIKE '%can\\'t a_b\\\\%' )`);
   });
 
   it('extracts Map value type for mapKey filter with Map(String, UInt64)', () => {
