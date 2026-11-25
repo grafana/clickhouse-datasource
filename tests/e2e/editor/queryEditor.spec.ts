@@ -129,5 +129,26 @@ test.describe('Query editor', () => {
         .poll(async () => (await lines.allTextContents()).map((line) => line.replace(/\u00a0/g, ' ').trim()))
         .toEqual(['SELECT', '*', 'FROM', 'e2e_test.events', 'WHERE', '$__timeFilter(timestamp)']);
     });
+
+    test('formats a query with an interval that has no quotes', async ({ page }) => {
+      await page.goto(exploreUrl());
+      await enterSql(page, 'SELECT $__timeGroup(timestamp, 5m) AS time, count() FROM e2e_test.events GROUP BY time');
+      await page.locator('.query-editor-row').getByRole('button', { name: 'Format query' }).click();
+
+      // The formatter can't parse a word that starts with a digit, such as `5m`, so that word gets a
+      // placeholder. Without one, the query stays on one line.
+      const lines = page.locator('.monaco-editor .view-line');
+      await expect
+        .poll(async () => (await lines.allTextContents()).map((line) => line.replace(/\u00a0/g, ' ').trim()))
+        .toEqual([
+          'SELECT',
+          '$__timeGroup(timestamp, 5m) AS time,',
+          'count()',
+          'FROM',
+          'e2e_test.events',
+          'GROUP BY',
+          'time',
+        ]);
+    });
   });
 });
