@@ -1,7 +1,11 @@
 // E2E coverage for Monaco autocomplete registration in the SQL editor. Unit
-// tests cover the suggestion providers in isolation; only E2E confirms that
-// remounting SqlEditor in the same document (toggling the editor type) does not
-// re-register completion providers and duplicate every suggestion.
+// tests cover the suggestion providers in isolation; E2E confirms that a
+// SqlEditor remounted in the same document (toggling the editor type) still
+// offers the plugin macros, each once. It does not catch a missing dispose:
+// each provider answers only for its own editor's model, and a disposed
+// editor's getModel() is null, so a leaked provider returns nothing. Unit tests
+// in src/components/SqlEditor.test.tsx and src/components/sqlProvider.test.ts
+// check the dispose instead.
 
 import { expect, test } from '@grafana/plugin-e2e';
 import type { Page } from '@playwright/test';
@@ -51,11 +55,13 @@ function exploreUrlWithTwoSqlQueries(): string {
 }
 
 /**
- * Remount SqlEditor inside the same document by toggling the editor type.
- * registerSQL registers the completion provider against the global 'sql' language, so only
- * an in-document remount can leave a stale provider answering alongside the new one. A full
- * page navigation tears Monaco down with the rest of the document and always re-registers
- * cleanly, which is why it cannot catch a missing dispose.
+ * Remount SqlEditor inside the same document by toggling the editor type. The test then checks
+ * that the remounted editor still offers the same macros, each once. It cannot catch a missing
+ * dispose: a leaked provider stays registered for the global 'sql' language, but it answers only
+ * for its own editor's model, and a disposed editor's getModel() is null, so it returns nothing.
+ * Unit tests check the dispose: 'disposes Monaco language providers when the editor unmounts' in
+ * SqlEditor.test.tsx and 'disposes the completion and formatting providers when dispose() is
+ * called' in sqlProvider.test.ts.
  */
 async function remountSqlEditor(page: Page) {
   // Close the open suggest widget so the next capture cannot read the previous one.
