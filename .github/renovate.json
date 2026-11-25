@@ -13,6 +13,21 @@
       "groupSlug": null
     },
     {
+      "description": "Put typescript-eslint back in one PR. The rule above also drops Renovate's monorepo group, and the plugin peers on the exact same parser version, so bumping one alone fails the lock file update",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["@typescript-eslint/**", "typescript-eslint"],
+      "groupName": "typescript-eslint",
+      "groupSlug": "typescript-eslint"
+    },
+    {
+      "description": "@grafana/eslint-config 9 peers on eslint-plugin-react-hooks >=7, so take both majors in one PR. The new react-hooks rules may need lint fixes on that branch",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["@grafana/eslint-config", "eslint-plugin-react-hooks"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "grafana eslint-config and react-hooks",
+      "groupSlug": "grafana-eslint-config-react-hooks"
+    },
+    {
       "description": "@grafana/* 13.2+ peers on react >=19 and we ship React 18 for Grafana 11.6+. Raise grafanaDependency first, then lift this cap",
       "matchDatasources": ["npm"],
       "matchPackageNames": ["@grafana/data", "@grafana/runtime", "@grafana/schema", "@grafana/ui"],
