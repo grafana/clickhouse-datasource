@@ -440,7 +440,8 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
       queryParts.push('AND');
     }
 
-    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${escapeLikeValue(options.meta!.logMessageLike!)}%')`);
+    const likeValue = escapeLikeValue(options.meta!.logMessageLike!);
+    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${likeValue}%')`);
   }
 
   const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
@@ -745,13 +746,10 @@ export const isPlainStringValue = (value: string): boolean => value === value.tr
 
 /**
  * Makes a value safe to sit inside the single-quoted `'%...%'` literal that LIKE filters build.
- * A single quote that is not already escaped (`''` or `\\'`) is doubled, so `it's` stays valid SQL
- * while values that were already escaped by hand keep working.
+ * ClickHouse string literals use backslash escapes, so backslashes are doubled first and then
+ * single quotes are backslash-escaped. The value is searched for as typed.
  */
-export const escapeLikeValue = (value: string): string =>
-  value.replace(/(\\?)('+)/g, (match, backslash: string, quotes: string) =>
-    backslash || quotes.length % 2 === 0 ? match : `${quotes}'`
-  );
+export const escapeLikeValue = (value: string): string => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 const escapeValue = (value: string | number | boolean): string => {
   // Filter values are typed as strings, but JSON-typed attribute columns can

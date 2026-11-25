@@ -223,7 +223,7 @@ describe('SQL Generator', () => {
       meta: { logMessageLike: "it's" },
     };
 
-    expect(generateSql(opts)).toContain("(body LIKE '%it''s%')");
+    expect(generateSql(opts)).toContain("(body LIKE '%it\\'s%')");
   });
 
   it('escapes single quotes in LIKE filter values', () => {
@@ -244,14 +244,15 @@ describe('SQL Generator', () => {
       ],
     } as QueryBuilderOptions;
 
-    expect(_testExports.getFilters(options)).toEqual("( Body LIKE '%it''s%' )");
+    expect(_testExports.getFilters(options)).toEqual("( Body LIKE '%it\\'s%' )");
   });
 
-  it('leaves already escaped quotes in LIKE values alone', () => {
-    expect(escapeLikeValue("it''s")).toEqual("it''s");
-    expect(escapeLikeValue("it\\'s")).toEqual("it\\'s");
-    expect(escapeLikeValue("it's")).toEqual("it''s");
-    expect(escapeLikeValue("'a' 'b'")).toEqual("''a'' ''b''");
+  it('escapes backslashes and quotes in LIKE values so the literal stays closed', () => {
+    expect(escapeLikeValue("it's")).toEqual("it\\'s");
+    expect(escapeLikeValue("it''s")).toEqual("it\\'\\'s");
+    expect(escapeLikeValue("a\\'b")).toEqual("a\\\\\\'b");
+    expect(escapeLikeValue('C:\\new')).toEqual('C:\\\\new');
+    expect(escapeLikeValue('\\')).toEqual('\\\\');
     expect(escapeLikeValue('plain')).toEqual('plain');
   });
 
