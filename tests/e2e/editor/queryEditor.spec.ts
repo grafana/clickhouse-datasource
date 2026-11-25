@@ -112,4 +112,22 @@ test.describe('Query editor', () => {
       await expect(page.getByRole('radio', { name: 'Traces' })).toBeChecked();
     });
   });
+
+  // Format query runs Monaco's format action, which calls the plugin's formatting provider in the
+  // browser, so the query is never run and needs no fixture data.
+  test.describe('Format query', () => {
+    test('keeps a macro and its arguments together', async ({ page }) => {
+      await page.goto(exploreUrl());
+      await enterSql(page, 'SELECT * FROM e2e_test.events WHERE $__timeFilter(timestamp)');
+      await page.locator('.query-editor-row').getByRole('button', { name: 'Format query' }).click();
+
+      // The backend reads a macro's arguments only when the bracket follows its name, so
+      // `$__timeFilter (timestamp)` fails with "Could not apply macros". Monaco renders spaces in
+      // its view lines as non-breaking spaces; the indentation is left out of the comparison.
+      const lines = page.locator('.monaco-editor .view-line');
+      await expect
+        .poll(async () => (await lines.allTextContents()).map((line) => line.replace(/\u00a0/g, ' ').trim()))
+        .toEqual(['SELECT', '*', 'FROM', 'e2e_test.events', 'WHERE', '$__timeFilter(timestamp)']);
+    });
+  });
 });
