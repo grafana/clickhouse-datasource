@@ -30,6 +30,8 @@ interface CursorCte {
   name: string;
   body: SelectQueryNode;
   scope: Map<string, SelectQueryNode>;
+  // The CTE bodies around the cursor, which are still being defined there.
+  resolving: Set<SelectQueryNode>;
 }
 
 interface CursorData {
@@ -47,7 +49,8 @@ interface CursorData {
 function getCursorInSelectQueryNode(
   root: SelectQueryNode,
   cursorPosition: number,
-  outerScope: Map<string, SelectQueryNode> = new Map()
+  outerScope: Map<string, SelectQueryNode> = new Map(),
+  resolving: Set<SelectQueryNode> = new Set()
 ): CursorData {
   // A query that starts with WITH has no SELECT token until its outer SELECT is typed, for example
   // while the cursor is still in the first CTE body.
@@ -68,9 +71,10 @@ function getCursorInSelectQueryNode(
   if (root.from) {
     cursorData.database = root.from.database;
     cursorData.table = root.from.table;
+    // Inside a CTE body the CTE's own name reads the table, as in ClickHouse.
     const body = cteNamedBy(root.from, scope);
-    if (body) {
-      cursorData.cte = { name: root.from.table!, body, scope };
+    if (body && !resolving.has(body)) {
+      cursorData.cte = { name: root.from.table!, body, scope, resolving };
     }
   }
 
@@ -82,7 +86,13 @@ function getCursorInSelectQueryNode(
     switch (node.type) {
       case QueryNodeType.Select:
         const selectNode = node as SelectQueryNode;
-        const nestedCursorData = getCursorInSelectQueryNode(selectNode, cursorPosition, scope);
+        const isCteBody = [...(root.withAliases?.values() ?? [])].includes(selectNode);
+        const nestedCursorData = getCursorInSelectQueryNode(
+          selectNode,
+          cursorPosition,
+          scope,
+          isCteBody ? new Set([...resolving, selectNode]) : resolving
+        );
         // +1/-1 to exclude subquery parenthesis
         if (cursorPosition >= nestedCursorData.begin - 1 && cursorPosition <= nestedCursorData.end + 1) {
           return nestedCursorData;
@@ -445,7 +455,7 @@ function cteColumns(
 }
 
 async function fetchCteFieldSuggestions(schema: Schema, range: Range, text: string, cte: CursorCte, prefix?: string) {
-  const { names, tables } = cteColumns(text, cte.body, cte.scope);
+  const { names, tables } = cteColumns(text, cte.body, cte.scope, new Set(cte.resolving));
   const suggestions: monacoTypes.languages.CompletionItem[] = [];
   for (const { database, table } of tables) {
     const db = database || schema.defaultDatabase || 'default';

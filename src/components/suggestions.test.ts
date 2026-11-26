@@ -553,8 +553,23 @@ describe('Suggestions in queries with CTEs', () => {
     ]);
   });
 
+  it.each([
+    ['in its select list', 'WITH logs AS (SELECT | FROM logs) SELECT * FROM logs'],
+    ['in its select list while the body is still being typed', 'WITH logs AS (SELECT | FROM logs'],
+    ['in a subquery of its body', 'WITH logs AS (SELECT * FROM (SELECT | FROM logs)) SELECT * FROM logs'],
+  ])('suggests the table columns inside a CTE body that names the CTE %s', async (_label, sql) => {
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
   it('reads the table when two CTEs name each other', async () => {
     const sql = 'WITH logs AS (SELECT * FROM b), b AS (SELECT * FROM logs) SELECT * FROM logs WHERE |';
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
+  // In the body of `logs`, `b` reads the CTE, and the `logs` that `b` reads is the table, because
+  // `logs` is still being defined there.
+  it('reads the table when two CTEs name each other, inside the first body', async () => {
+    const sql = 'WITH logs AS (SELECT | FROM b), b AS (SELECT * FROM logs) SELECT * FROM logs';
     expect(await labels(sql)).toEqual(['Severity', 'Message']);
   });
 
