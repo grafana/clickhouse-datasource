@@ -77,6 +77,7 @@ import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './json
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
   foldDiscoveredLogFieldsIntoLabels,
+  foldSqlLogFieldsIntoLabels,
   labelsFieldName,
   mapGrafanaFormatToQueryType,
   transformQueryResponseWithTraceAndLogLinks,
@@ -1869,6 +1870,7 @@ export class Datasource
         concatMap(async (res: DataQueryResponse) => {
           let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
           transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
+          transformed = foldSqlLogFieldsIntoLabels(this, request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -2750,9 +2752,9 @@ export class Datasource
    * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
    * how to bucket those keys into named, collapsible sections.
    *
-   * Unprefixed keys (folded Columns or a table's own `labels` map) return
-   * null. On a row with labels, Grafana renders plain fields such as the
-   * level only in the null group.
+   * Unprefixed keys (folded Columns, the folded plain columns of a SQL logs
+   * query, or a table's own `labels` map) return null. On a row with labels,
+   * Grafana renders plain fields such as the level only in the null group.
    *
    * Strings are plain English; the plugin codebase does not currently
    * use `@grafana/i18n`, so a future i18n pass would localize these

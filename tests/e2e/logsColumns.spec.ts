@@ -349,6 +349,35 @@ test.describe('Log details for a labels map', () => {
   });
 });
 
+// A Map selected as ResourceAttributes is merged into `labels` with prefixed keys, which all go to the
+// Resource attributes group. foldSqlLogFieldsIntoLabels (src/data/utils.ts) folds the plain columns
+// into `labels`, so Grafana 12.4 and later still lists them, and the level, next to the group.
+test.describe('Log details for OTel attribute maps in a SQL query', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Depends on the local e2e_test.events fixture (tests/e2e/fixtures/seed.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
+  test('shows the level and plain columns next to an OTel attribute map', async ({ page, explorePage }) => {
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.goto(
+      exploreUrl(
+        DATASOURCE_UID,
+        "SELECT timestamp, message, level, service, map('region', 'eu') AS ResourceAttributes FROM e2e_test.events ORDER BY timestamp DESC"
+      )
+    );
+    await responsePromise;
+    expect(rowCount(getBody())).toBeGreaterThan(0);
+
+    await openFirstLogRowDetails(page);
+    await expect(detailsFieldValue(page, 'ResourceAttributes.region', 'eu')).toBeVisible();
+    await expect(detailsFieldValue(page, 'level', 'error')).toBeVisible();
+    await expect(detailsFieldValue(page, 'service', 'db')).toBeVisible();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Attribute columns: a JSON (or Map) column named in logs.attributeColumns is
 // projected into the compact logs query, and the backend

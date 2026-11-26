@@ -2216,6 +2216,99 @@ describe('ClickHouseDatasource', () => {
       const labels = frame.fields.find((f) => f.name === 'labels')!.values[0];
       expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
     });
+
+    // On Grafana 12.4 and later, log details drop plain fields when every label of a row is in a named
+    // group. A SQL logs query that selects the OTel attribute maps gets only grouped labels, so query()
+    // folds its plain columns into `labels` (foldSqlLogFieldsIntoLabels) to keep them in log details.
+    it('folds the plain columns of a SQL logs query with OTel attribute maps into labels', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql:
+          "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, ResourceAttributes['k8s.pod.name'] AS pod, LogAttributes, ResourceAttributes FROM otel.otel_logs",
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+          { name: 'pod', type: FieldType.string, config: {}, values: ['cart-7d9f'] } as Field,
+          {
+            name: 'labels',
+            type: FieldType.other,
+            config: {},
+            values: [{ 'ResourceAttributes.k8s.pod.name': 'cart-7d9f', 'LogAttributes.event.name': 'proxy.access' }],
+          } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      const frame = response.data[0] as DataFrame;
+      expect(frame.fields.map((f) => f.name)).toEqual(['timestamp', 'body', 'level', 'labels']);
+      expect(frame.fields.find((f) => f.name === 'labels')!.values[0]).toEqual({
+        'ResourceAttributes.k8s.pod.name': 'cart-7d9f',
+        'LogAttributes.event.name': 'proxy.access',
+        ServiceName: 'cart',
+        pod: 'cart-7d9f',
+      });
+    });
+
+    it('leaves a SQL logs query without OTel attribute maps as is', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql: 'SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName FROM otel.otel_logs',
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      expect((response.data[0] as DataFrame).fields.map((f) => f.name)).toEqual([
+        'timestamp',
+        'body',
+        'level',
+        'ServiceName',
+      ]);
+    });
   });
 
   describe('SupplementaryQueriesSupport', () => {
