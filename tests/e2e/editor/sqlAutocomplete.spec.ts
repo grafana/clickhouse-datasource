@@ -83,6 +83,53 @@ async function remountSqlEditor(page: Page) {
   await expect(page.getByRole('radio', { name: 'SQL Editor' })).toBeChecked();
 }
 
+const VARIABLE_DASHBOARD_UID = 'e2e-sql-autocomplete-variable';
+
+// Explore has no dashboard variables, so this suite edits the panel of a dashboard that has one.
+test.describe('SQL editor autocomplete in a dashboard', () => {
+  test.beforeEach(async ({ request }) => {
+    skipFixtureTestsOnCloud('seed.sql');
+    const datasource = { type: PLUGIN_TYPE, uid: DATASOURCE_UID };
+    const dashboard = {
+      uid: VARIABLE_DASHBOARD_UID,
+      title: 'E2E SQL autocomplete variable',
+      schemaVersion: 39,
+      templating: { list: [{ type: 'custom', name: 'service', query: 'api,worker' }] },
+      panels: [
+        {
+          id: 1,
+          type: 'table',
+          title: 'events',
+          gridPos: { x: 0, y: 0, w: 24, h: 8 },
+          datasource,
+          targets: [{ refId: 'A', datasource, editorType: 'sql', format: 1, queryType: 'table', rawSql: '' }],
+        },
+      ],
+    };
+    const created = await request.post('/api/dashboards/db', { data: { dashboard, overwrite: true } });
+    expect(created.ok()).toBe(true);
+  });
+
+  test.afterEach(async ({ request }) => {
+    await request.delete(`/api/dashboards/uid/${VARIABLE_DASHBOARD_UID}`);
+  });
+
+  test('inserts a variable picked after `$` without repeating the `$`', async ({ page, gotoPanelEditPage }) => {
+    const panelEditPage = await gotoPanelEditPage({ dashboard: { uid: VARIABLE_DASHBOARD_UID }, id: '1' });
+    await typeSqlLeavingSuggestionsOpen(page, 'SELECT * FROM e2e_test.events WHERE service = $');
+    await page
+      .locator('.monaco-editor .suggest-widget.visible .monaco-list-row')
+      .filter({ hasText: '${service}' })
+      .click();
+
+    // Monaco keeps the typed `$` in place, since it is a word separator, so the suggestion has to
+    // insert only `{service}` after it.
+    await expect(panelEditPage.getQueryEditorRow('A').locator('.view-line')).toHaveText([
+      'SELECT * FROM e2e_test.events WHERE service = ${service}',
+    ]);
+  });
+});
+
 test.describe('SQL editor autocomplete', () => {
   test('starts a new line on Enter after a space instead of inserting a suggestion', async ({ page }) => {
     await page.goto(exploreUrl());
