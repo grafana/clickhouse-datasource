@@ -53,8 +53,15 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// SkipConnectionPings skips the nil-message bootstrap ping in Connect. Pings
+	// on per-query connections still run.
+	SkipConnectionPings bool            `json:"skipConnectionPings,omitempty"`
+	CustomSettings      []CustomSetting `json:"customSettings"`
+	ProxyOptions        *proxy.Options
+
+	// KeepCookiesConfigured is true when jsonData.keepCookies (Grafana's generic
+	// "Forward cookies" setting, not declared by this plugin) lists a cookie.
+	KeepCookiesConfigured bool `json:"-"`
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -222,6 +229,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 	if settings.OAuthPassThruAllowFallback, err = boolSetting(jsonData, "oauthPassThruAllowFallback"); err != nil {
 		return settings, err
+	}
+
+	if settings.SkipConnectionPings, err = boolSetting(jsonData, "skipConnectionPings"); err != nil {
+		return settings, err
+	}
+
+	// keepCookies is Grafana's own jsonData field for the "Forward cookies" HTTP
+	// setting; it is not declared by this plugin, so read it straight from the
+	// generic jsonData map rather than the Settings struct.
+	if keepCookies, ok := jsonData["keepCookies"].([]interface{}); ok && len(keepCookies) > 0 {
+		settings.KeepCookiesConfigured = true
 	}
 
 	if settings.EnableRowLimit, err = boolSetting(jsonData, "enableRowLimit"); err != nil {
