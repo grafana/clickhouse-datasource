@@ -3,6 +3,7 @@ package macros
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -228,6 +229,33 @@ func timeBoundary(name, op string, t time.Time, args []string) (string, error) {
 		sqlutil.ErrorBadArgumentCount, name, len(args), name, name))
 }
 
+// dayWeekInterval matches a single day or week interval such as 1d or 2w, which
+// time.ParseDuration rejects but Grafana interval strings commonly use.
+var dayWeekInterval = regexp.MustCompile(`^(\d+)([dw])$`)
+
+func parseTimeGroupInterval(s string) (time.Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err == nil {
+		return d, nil
+	}
+	m := dayWeekInterval.FindStringSubmatch(s)
+	if m == nil {
+		return 0, err
+	}
+	n, convErr := strconv.ParseInt(m[1], 10, 64)
+	if convErr != nil {
+		return 0, convErr
+	}
+	unit := 24 * time.Hour
+	if m[2] == "w" {
+		unit = 7 * 24 * time.Hour
+	}
+	if n > int64(math.MaxInt64/unit) {
+		return 0, fmt.Errorf("interval %q is too large", s)
+	}
+	return time.Duration(n) * unit, nil
+}
+
 // TimeGroup overrides sqlutil's SQL-Server-style datepart() output — which
 // is invalid syntax in ClickHouse — with toStartOfInterval, the ClickHouse
 // idiom for time bucketing.
@@ -239,7 +267,7 @@ func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error)
 	col := strings.TrimSpace(args[0])
 	periodStr := strings.Trim(strings.TrimSpace(args[1]), "'\"")
 
-	d, err := time.ParseDuration(periodStr)
+	d, err := parseTimeGroupInterval(periodStr)
 	if err != nil {
 		return "", backend.DownstreamError(fmt.Errorf("$__timeGroup: invalid interval %q: %w", periodStr, err))
 	}

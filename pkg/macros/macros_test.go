@@ -284,6 +284,18 @@ func TestMacroTimeGroup(t *testing.T) {
 // TestMacroErrorsAreDownstream ensures bad-argument and bad-duration errors
 // are wrapped as downstream errors so grafana classifies them as user input
 // errors rather than plugin bugs.
+func TestMacroTimeGroupDayAndWeekIntervals(t *testing.T) {
+	ctx := makeCtx(time.Unix(0, 0), time.Unix(1, 0), time.Second)
+	for interval, secs := range map[string]string{"1d": "86400", "7d": "604800", "2w": "1209600", "'1d'": "86400"} {
+		got, err := TimeGroup(ctx, []string{"ts", interval})
+		require.NoError(t, err, interval)
+		assert.Equal(t, "toStartOfInterval(toDateTime(ts), INTERVAL "+secs+" second)", got, interval)
+	}
+
+	_, err := TimeGroup(ctx, []string{"ts", "0d"})
+	assert.Error(t, err)
+}
+
 func TestMacroErrorsAreDownstream(t *testing.T) {
 	ctx := makeCtx(time.Time{}, time.Time{}, 0)
 
