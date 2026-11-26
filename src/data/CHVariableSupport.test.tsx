@@ -27,10 +27,7 @@ describe('generateVariableSql', () => {
   });
 
   it('lists tables in a specific database when one is selected', () => {
-    const sql = generateVariableSql(
-      baseQuery({ queryType: 'tables', database: 'otel' }),
-      'default'
-    );
+    const sql = generateVariableSql(baseQuery({ queryType: 'tables', database: 'otel' }), 'default');
     expect(sql).toBe("SELECT name FROM system.tables WHERE database = 'otel' ORDER BY name");
   });
 
@@ -45,20 +42,13 @@ describe('generateVariableSql', () => {
   });
 
   it('lists columns for a fully-specified database and table', () => {
-    const sql = generateVariableSql(
-      baseQuery({ queryType: 'columns', database: 'otel', table: 'otel_logs' }),
-      ''
-    );
-    expect(sql).toBe(
-      "SELECT name FROM system.columns WHERE database = 'otel' AND table = 'otel_logs' ORDER BY name"
-    );
+    const sql = generateVariableSql(baseQuery({ queryType: 'columns', database: 'otel', table: 'otel_logs' }), '');
+    expect(sql).toBe("SELECT name FROM system.columns WHERE database = 'otel' AND table = 'otel_logs' ORDER BY name");
   });
 
   it('returns empty SQL for column values when required fields are missing', () => {
     expect(generateVariableSql(baseQuery({ queryType: 'columnValues' }), '')).toBe('');
-    expect(
-      generateVariableSql(baseQuery({ queryType: 'columnValues', database: 'otel', table: 't' }), '')
-    ).toBe('');
+    expect(generateVariableSql(baseQuery({ queryType: 'columnValues', database: 'otel', table: 't' }), '')).toBe('');
   });
 
   it('reads distinct values from a regular column', () => {
@@ -146,9 +136,7 @@ describe('generateVariableSql', () => {
   });
 
   it('preserves the existing rawSql when the type is Custom SQL', () => {
-    expect(
-      generateVariableSql(baseQuery({ queryType: 'sql', rawSql: 'SELECT 1' }), 'default')
-    ).toBe('SELECT 1');
+    expect(generateVariableSql(baseQuery({ queryType: 'sql', rawSql: 'SELECT 1' }), 'default')).toBe('SELECT 1');
   });
 });
 
@@ -170,6 +158,8 @@ describe('pickerLevelFor', () => {
 const buildDatasource = (overrides: Partial<Datasource> = {}): Datasource => {
   const ds = {} as Datasource;
   ds.getDefaultDatabase = jest.fn(() => 'default');
+  ds.isSingleTableMode = jest.fn(() => false);
+  ds.getSignalType = jest.fn(() => undefined);
   ds.fetchDatabases = jest.fn(() => Promise.resolve(['default', 'otel']));
   ds.fetchTables = jest.fn(() => Promise.resolve(['otel_logs', 'otel_traces']));
   const columns: TableColumn[] = [
@@ -190,12 +180,7 @@ describe('VariableQueryEditor', () => {
     const onChange = jest.fn();
     const result = await waitFor(() =>
       render(
-        <VariableQueryEditor
-          datasource={datasource}
-          query={baseQuery()}
-          onChange={onChange}
-          onRunQuery={() => {}}
-        />
+        <VariableQueryEditor datasource={datasource} query={baseQuery()} onChange={onChange} onRunQuery={() => {}} />
       )
     );
     expect(result.getByLabelText('Variable type')).toBeInTheDocument();
@@ -208,12 +193,7 @@ describe('VariableQueryEditor', () => {
     const onChange = jest.fn();
     const result = await waitFor(() =>
       render(
-        <VariableQueryEditor
-          datasource={datasource}
-          query={baseQuery()}
-          onChange={onChange}
-          onRunQuery={() => {}}
-        />
+        <VariableQueryEditor datasource={datasource} query={baseQuery()} onChange={onChange} onRunQuery={() => {}} />
       )
     );
     const typeCombobox = result.getByLabelText('Variable type');
@@ -277,6 +257,51 @@ describe('VariableQueryEditor', () => {
       )
     );
     expect(result.getByLabelText('SQL Query')).toHaveValue('SELECT name FROM system.databases');
+  });
+});
+
+describe('VariableQueryEditor on a metrics data source', () => {
+  const buildMetricsDatasource = () =>
+    buildDatasource({
+      isSingleTableMode: jest.fn(() => true),
+      getSignalType: jest.fn(() => 'metrics' as const),
+      getDefaultMetricsDatabase: jest.fn(() => 'otel'),
+      resolveMetricTables: jest.fn(() => Promise.resolve({ gauge: 'otel_metrics_gauge', sum: 'otel_metrics_sum' })),
+      fetchMetricCatalog: jest.fn(() => Promise.resolve([])),
+      fetchMetricLabelKeys: jest.fn(() => Promise.resolve([])),
+    });
+
+  it('offers the metrics variable types', async () => {
+    const result = render(
+      <VariableQueryEditor
+        datasource={buildMetricsDatasource()}
+        query={baseQuery()}
+        onChange={jest.fn()}
+        onRunQuery={() => {}}
+      />
+    );
+    fireEvent.keyDown(result.getByLabelText('Variable type'), { key: 'ArrowDown' });
+    expect(await result.findByText('Label values')).toBeInTheDocument();
+    expect(result.getByText('Metric names')).toBeInTheDocument();
+  });
+
+  it('resolves the metric tables and generates the label values SQL', async () => {
+    const onChange = jest.fn();
+    render(
+      <VariableQueryEditor
+        datasource={buildMetricsDatasource()}
+        query={baseQuery({ queryType: 'metricLabelValues', metricLabel: { source: 'column', key: 'ServiceName' } })}
+        onChange={onChange}
+        onRunQuery={() => {}}
+      />
+    );
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const next = onChange.mock.calls[onChange.mock.calls.length - 1][0] as CHVariableQuery;
+    expect(next.metricTables).toEqual(['otel_metrics_gauge', 'otel_metrics_sum']);
+    expect(next.rawSql).toContain('SELECT DISTINCT toString("ServiceName") AS value FROM "otel"."otel_metrics_gauge"');
+    expect(next.rawSql).toContain(
+      'UNION ALL SELECT DISTINCT toString("ServiceName") AS value FROM "otel"."otel_metrics_sum"'
+    );
   });
 });
 
@@ -463,4 +488,3 @@ describe('CHVariableSupport', () => {
     expect(frame.fields[1].values).toEqual([null]);
   });
 });
-

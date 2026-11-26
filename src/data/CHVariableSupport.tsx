@@ -15,17 +15,15 @@ import { CHConfig } from 'types/config';
 import { CHQuery } from 'types/sql';
 import { escapeIdentifier } from './sqlGenerator';
 import { Datasource, escapeCHStringLiteral } from './CHDatasource';
+import { getMetricLabelValuesVariableSql, getMetricNamesVariableSql } from './metrics';
+import { MetricVariableEditor, MetricVariableFields } from 'components/queryBuilder/metrics/MetricVariableEditor';
 
 /**
  * Variable query types. Each one renders a different combination of pickers and
  * generates a default SQL query that the user can edit before saving.
  */
 export type CHVariableQueryType =
-  | 'sql'
-  | 'databases'
-  | 'tables'
-  | 'columns'
-  | 'columnValues';
+  'sql' | 'databases' | 'tables' | 'columns' | 'columnValues' | 'metricNames' | 'metricLabelValues';
 
 /** Variable query model. Persisted as part of the dashboard JSON. */
 export interface CHVariableQuery {
@@ -39,6 +37,13 @@ export interface CHVariableQuery {
   mapKey?: string;
   /** Captured at pick time so the runtime path doesn't need to refetch the column type. */
   columnIsMap?: boolean;
+  /** Fields of the metric variable types, see MetricVariableFields. */
+  metricName?: MetricVariableFields['metricName'];
+  metricType?: MetricVariableFields['metricType'];
+  metricLabel?: MetricVariableFields['metricLabel'];
+  metricFilters?: MetricVariableFields['metricFilters'];
+  metricTables?: MetricVariableFields['metricTables'];
+  jsonAttributes?: MetricVariableFields['jsonAttributes'];
 }
 
 const VARIABLE_TYPE_OPTIONS: Array<{ label: string; value: CHVariableQueryType; description?: string }> = [
@@ -48,6 +53,15 @@ const VARIABLE_TYPE_OPTIONS: Array<{ label: string; value: CHVariableQueryType; 
   { label: 'List columns', value: 'columns', description: 'Columns inside a table' },
   { label: 'Column values', value: 'columnValues', description: 'Distinct values of a column or Map key' },
 ];
+
+/** Variable types of data sources in single source mode for metrics. */
+const METRIC_VARIABLE_TYPE_OPTIONS: Array<{ label: string; value: CHVariableQueryType; description?: string }> = [
+  { label: 'Label values', value: 'metricLabelValues', description: 'Values of a metric label, like label_values()' },
+  { label: 'Metric names', value: 'metricNames', description: 'Names of the OTel metrics' },
+];
+
+const isMetricVariableType = (queryType: CHVariableQueryType): queryType is MetricVariableFields['queryType'] =>
+  queryType === 'metricNames' || queryType === 'metricLabelValues';
 
 /** Returns the SchemaPicker depth for a query type, or null when no picker is needed. */
 export function pickerLevelFor(queryType: CHVariableQueryType): SchemaPickerLevel | null {
@@ -97,6 +111,16 @@ export function generateVariableSql(query: CHVariableQuery, defaultDatabase: str
       }
       return `SELECT DISTINCT ${column} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${column} IS NOT NULL ORDER BY value LIMIT 1000`;
     }
+    case 'metricNames':
+      return getMetricNamesVariableSql(db, query.metricTables || []);
+    case 'metricLabelValues':
+      return query.metricLabel
+        ? getMetricLabelValuesVariableSql(db, query.metricTables || [], query.metricLabel, {
+            metricName: query.metricName,
+            filters: query.metricFilters,
+            jsonAttributes: query.jsonAttributes,
+          })
+        : '';
     case 'sql':
     default:
       return query.rawSql || '';
@@ -120,6 +144,12 @@ export const VariableQueryEditor = (props: EditorProps) => {
       column: query?.column,
       mapKey: query?.mapKey,
       columnIsMap: query?.columnIsMap,
+      metricName: query?.metricName,
+      metricType: query?.metricType,
+      metricLabel: query?.metricLabel,
+      metricFilters: query?.metricFilters,
+      metricTables: query?.metricTables,
+      jsonAttributes: query?.jsonAttributes,
     }),
     [
       legacyRawSql,
@@ -131,11 +161,31 @@ export const VariableQueryEditor = (props: EditorProps) => {
       query?.column,
       query?.mapKey,
       query?.columnIsMap,
+      query?.metricName,
+      query?.metricType,
+      query?.metricLabel,
+      query?.metricFilters,
+      query?.metricTables,
+      query?.jsonAttributes,
     ]
   );
 
-  const defaultDatabase = datasource.getDefaultDatabase() || '';
+  const isMetricsSource = datasource.isSingleTableMode() && datasource.getSignalType() === 'metrics';
+  const defaultDatabase =
+    (isMetricsSource ? datasource.getDefaultMetricsDatabase() : datasource.getDefaultDatabase()) || '';
   const pickerLevel = pickerLevelFor(safeQuery.queryType);
+  const typeOptions = isMetricsSource
+    ? [...METRIC_VARIABLE_TYPE_OPTIONS, ...VARIABLE_TYPE_OPTIONS]
+    : VARIABLE_TYPE_OPTIONS;
+
+  const onMetricChange = useCallback(
+    (changes: Partial<MetricVariableFields>) => {
+      const next: CHVariableQuery = { ...safeQuery, ...changes };
+      next.rawSql = generateVariableSql(next, defaultDatabase);
+      onChange(next);
+    },
+    [defaultDatabase, onChange, safeQuery]
+  );
 
   const onTypeChange = useCallback(
     (queryType: CHVariableQueryType) => {
@@ -197,20 +247,23 @@ export const VariableQueryEditor = (props: EditorProps) => {
       >
         <Select
           width={40}
-          options={VARIABLE_TYPE_OPTIONS}
+          options={typeOptions}
           value={safeQuery.queryType}
           onChange={(v) => onTypeChange((v.value as CHVariableQueryType) || 'sql')}
           aria-label="Variable type"
         />
       </InlineField>
 
-      {pickerLevel && (
-        <SchemaPicker
+      {isMetricVariableType(safeQuery.queryType) && (
+        <MetricVariableEditor
           datasource={datasource}
-          value={pickerValue}
-          onChange={onPickerChange}
-          level={pickerLevel}
+          query={{ ...safeQuery, queryType: safeQuery.queryType }}
+          onChange={onMetricChange}
         />
+      )}
+
+      {pickerLevel && (
+        <SchemaPicker datasource={datasource} value={pickerValue} onChange={onPickerChange} level={pickerLevel} />
       )}
 
       <InlineField

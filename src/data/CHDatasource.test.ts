@@ -23,6 +23,7 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
@@ -1540,6 +1541,77 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('metrics metadata lookups', () => {
+    const tablesFrame = arrayToDataFrame([
+      { name: 'otel_metrics_gauge' },
+      { name: 'otel_metrics_sum' },
+      { name: 'otel_metrics_histogram' },
+      { name: 'otel_metrics_exp_histogram' },
+      { name: 'otel_metrics_summary' },
+    ]);
+    const catalogFrame = arrayToDataFrame([{ name: 'cpu', type: 'gauge', unit: '1', description: '', monotonic: 0 }]);
+
+    const instance = () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      return { ds, spy };
+    };
+
+    // A new alert rule has no dashboard time range, and without one the lookups read from 1970.
+    it('falls back to the last 6 hours when the page has no time range', async () => {
+      const { ds, spy } = instance();
+      delete (templateSrvMock as any).timeRange;
+
+      await ds.fetchMetricCatalog();
+
+      const range = spy.mock.calls[1][0].range as TimeRange;
+      expect(range.from).toBeDefined();
+      expect(range.to.valueOf() - range.from.valueOf()).toBe(6 * 60 * 60 * 1000);
+      expect(range.to.valueOf()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('uses the page time range when there is one', async () => {
+      const { ds, spy } = instance();
+      const range = { from: dateTime(1735689600000), to: dateTime(1735693200000) };
+      (templateSrvMock as any).timeRange = range;
+
+      try {
+        await ds.fetchMetricCatalog();
+      } finally {
+        delete (templateSrvMock as any).timeRange;
+      }
+
+      expect(spy.mock.calls[1][0].range).toBe(range);
+    });
+
+    it('does not cache a database without metric tables', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      const tableQueries = () =>
+        spy.mock.calls.filter((call) => String(call[0].targets[0].rawSql).startsWith('SHOW TABLES')).length;
+
+      expect(await ds.resolveMetricTables()).toEqual({});
+      expect(await ds.resolveMetricTables()).toEqual({});
+      // A page opened before the exporter creates its tables retries instead of staying empty.
+      expect(tableQueries()).toBe(2);
+
+      spy.mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      const tables = await ds.resolveMetricTables();
+      expect(tables[MetricType.Gauge]).toBe('otel_metrics_gauge');
+      expect(tables[MetricType.Summary]).toBe('otel_metrics_summary');
+      await ds.resolveMetricTables();
+      expect(tableQueries()).toBe(3);
+    });
+  });
+
   describe('distinct value suggestions', () => {
     it('escapes identifiers for distinct column values', async () => {
       const ds = cloneDeep(mockDatasource);
@@ -1984,6 +2056,24 @@ describe('ClickHouseDatasource', () => {
       jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
 
       expect(await ds.fetchSqlFunctions()).toEqual([]);
+    });
+  });
+
+  describe('getMetricTableFeatures', () => {
+    it('reports a failed DESC TABLE instead of guessing the attribute layout, and reads again next time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchColumns = jest.spyOn(ds, 'fetchColumns').mockResolvedValueOnce([]);
+
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).rejects.toThrow('otel_metrics_gauge');
+
+      // The empty list was not kept, so asking again reads the schema instead of the failure.
+      fetchColumns.mockResolvedValueOnce([
+        { name: 'Attributes', type: 'JSON', label: 'Attributes', picklistValues: [] },
+      ]);
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).resolves.toEqual({
+        jsonAttributes: true,
+      });
+      expect(fetchColumns).toHaveBeenCalledTimes(2);
     });
   });
 

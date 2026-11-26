@@ -8,7 +8,11 @@ interface FilterTagBarProps {
   filters: Filter[];
   selectedColumns?: readonly SelectedColumn[];
   onRemoveFilter: (index: number) => void;
-  onEditFilter: (index: number) => void;
+  onEditFilter?: (index: number) => void;
+  /** Shows the "Filters:" label in front of the chips. Off where the surrounding field is labelled already. */
+  showLabel?: boolean;
+  /** Overrides how a filter's column is named in its chip. */
+  getDisplayName?: (filter: Filter) => string;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -123,7 +127,7 @@ const getOperatorDisplay = (operator: FilterOperator): string => {
 };
 
 export const FilterTagBar = (props: FilterTagBarProps) => {
-  const { filters, selectedColumns, onRemoveFilter, onEditFilter } = props;
+  const { filters, selectedColumns, onRemoveFilter, onEditFilter, showLabel = true, getDisplayName } = props;
   const styles = useStyles2(getStyles);
 
   const activeFilters = filters.filter(
@@ -139,7 +143,7 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
 
   return (
     <div className={styles.bar} data-testid="filter-tag-bar">
-      <span className={styles.label}>Filters:</span>
+      {showLabel && <span className={styles.label}>Filters:</span>}
       {filters.map((filter, index) => {
         if (filter.operator === FilterOperator.IsAnything && !filter.key) {
           return null;
@@ -151,7 +155,7 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
           return null;
         }
 
-        const name = getFilterDisplayName(filter, selectedColumns);
+        const name = getDisplayName?.(filter) ?? getFilterDisplayName(filter, selectedColumns);
         const operator = getOperatorDisplay(filter.operator);
         const value = getFilterDisplayValue(filter);
 
@@ -159,16 +163,20 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
           <span
             key={index}
             className={styles.tag}
-            role="button"
-            tabIndex={0}
-            aria-label={`Edit filter ${name} ${operator} ${value}`.trim()}
-            onClick={() => onEditFilter(index)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onEditFilter(index);
-              }
-            }}
+            role={onEditFilter ? 'button' : undefined}
+            tabIndex={onEditFilter ? 0 : undefined}
+            aria-label={onEditFilter ? `Edit filter ${name} ${operator} ${value}`.trim() : undefined}
+            onClick={onEditFilter ? () => onEditFilter(index) : undefined}
+            onKeyDown={
+              onEditFilter
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onEditFilter(index);
+                    }
+                  }
+                : undefined
+            }
           >
             {/* Tooltip clones its child and spreads its own handlers over it, which would drop the
                 chip's onKeyDown, so it wraps the content instead of the chip. */}

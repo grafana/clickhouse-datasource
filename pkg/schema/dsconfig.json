@@ -283,7 +283,7 @@
       "validations": [
         {
           "type": "allowedValues",
-          "values": ["logs", "traces"]
+          "values": ["logs", "traces", "metrics"]
         }
       ],
       "ui": {
@@ -298,6 +298,11 @@
             "label": "Traces",
             "value": "traces",
             "description": "Distributed tracing with spans and service maps"
+          },
+          {
+            "label": "Metrics",
+            "value": "metrics",
+            "description": "OTel metrics with a metric browser, rates, quantiles and label grouping"
           }
         ]
       }
@@ -915,6 +920,90 @@
       }
     },
     {
+      "id": "jsonData_metrics_defaultDatabase",
+      "key": "defaultDatabase",
+      "section": "metrics",
+      "label": "Metrics database",
+      "description": "The database holding the OTel metric tables",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "jsonData_metrics_gaugeTable",
+      "key": "gaugeTable",
+      "section": "metrics",
+      "label": "Gauge table",
+      "description": "Table with gauge data points (exporter option metrics_tables.gauge.name)",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_metrics_gauge",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_metrics_sumTable",
+      "key": "sumTable",
+      "section": "metrics",
+      "label": "Sum table",
+      "description": "Table with sum (counter) data points (exporter option metrics_tables.sum.name)",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_metrics_sum",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_metrics_histogramTable",
+      "key": "histogramTable",
+      "section": "metrics",
+      "label": "Histogram table",
+      "description": "Table with histogram data points (exporter option metrics_tables.histogram.name)",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_metrics_histogram",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_metrics_exponentialHistogramTable",
+      "key": "exponentialHistogramTable",
+      "section": "metrics",
+      "label": "Exponential histogram table",
+      "description": "Table with exponential histogram data points (exporter option metrics_tables.exponential_histogram.name)",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_metrics_exp_histogram",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_metrics_summaryTable",
+      "key": "summaryTable",
+      "section": "metrics",
+      "label": "Summary table",
+      "description": "Table with summary data points (exporter option metrics_tables.summary.name)",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_metrics_summary",
+      "dependsOn": "jsonData_signalType == 'metrics'",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
       "id": "jsonData_httpHeaders",
       "key": "httpHeaders",
       "label": "Custom HTTP Headers",
@@ -1209,7 +1298,13 @@
         "jsonData_traces_traceEventsColumnPrefix",
         "jsonData_traces_traceLinksColumnPrefix",
         "jsonData_traces_showTraceLinks",
-        "jsonData_traces_traceTimestampTableSuffix"
+        "jsonData_traces_traceTimestampTableSuffix",
+        "jsonData_metrics_defaultDatabase",
+        "jsonData_metrics_gaugeTable",
+        "jsonData_metrics_sumTable",
+        "jsonData_metrics_histogramTable",
+        "jsonData_metrics_exponentialHistogramTable",
+        "jsonData_metrics_summaryTable"
       ]
     },
     {

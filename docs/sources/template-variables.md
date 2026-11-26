@@ -42,6 +42,17 @@ To create a template variable that gets its values from ClickHouse:
 11. Configure **Multi-value** or **Include All option** if needed.
 12. Click **Apply** to save the variable.
 
+## Metrics variables
+
+On a data source in **Single source** mode for **Metrics**, the **Variable type** drop-down offers two extra types, similar to Prometheus' `label_values()`:
+
+- **Label values**: the values of a label, such as `ServiceName`, a resource attribute like `k8s.pod.name`, or a data point attribute. Pick a **Metric** to list the labels it has and read only its table. Without a metric, every metric table is read and only the `ServiceName` and `ScopeName` labels are offered. Add **Filters** to narrow the values, for example `ServiceName = $service` for a `pod` variable that lists only the pods of the selected services.
+- **Metric names**: the names of all metrics.
+
+Both read at most the last 6 hours of the dashboard time range and generate SQL you can still edit.
+
+To use a variable in a metrics query, add a label filter and pick the variable from the **Dashboard variables** group of the value list. Filters with `=`, `!=`, `in`, or `not in` work with single-value, multi-value, and **All** selections: the query uses `IN (${variable:singlequote})`, and when **All** is selected, the filter is left out with `$__conditionalAll`, so no long value list is sent.
+
 ## How query results become variable options
 
 The plugin uses the query result to build the variable’s drop-down options:

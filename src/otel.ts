@@ -5,6 +5,22 @@ export const defaultTraceTable = 'otel_traces';
 
 export const traceTimestampTableSuffix = '_trace_id_ts';
 
+/**
+ * Default metric table names of the opentelemetry-collector-contrib ClickHouse exporter
+ * (its `metrics_tables` option). Older exporter versions used the same names, apart from
+ * exponential histograms, see legacyExponentialHistogramTable.
+ */
+export const defaultMetricsTables = {
+  gaugeTable: 'otel_metrics_gauge',
+  sumTable: 'otel_metrics_sum',
+  histogramTable: 'otel_metrics_histogram',
+  exponentialHistogramTable: 'otel_metrics_exp_histogram',
+  summaryTable: 'otel_metrics_summary',
+} as const;
+
+/** The exponential histogram table name used by exporter versions before `metrics_tables`. */
+export const legacyExponentialHistogramTable = 'otel_metrics_exponential_histogram';
+
 export interface OtelVersion {
   name: string;
   version: string;
