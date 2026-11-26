@@ -212,4 +212,48 @@ describe('registerSQL', () => {
 
     expect(completionRegister.mock.calls[0][1].triggerCharacters).toEqual(['.', '$']);
   });
+
+  it('answers completion requests only for its own editor', async () => {
+    const providers: any[] = [];
+    (window as any).monaco = {
+      languages: {
+        registerCompletionItemProvider: jest.fn((_language: string, provider: any) => {
+          providers.push(provider);
+          return { dispose: jest.fn() };
+        }),
+        registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: jest.fn() })),
+      },
+      editor: {} as any,
+    };
+
+    const makeModel = () => ({
+      getValue: () => 'SELECT ',
+      getWordUntilPosition: () => ({ startColumn: 8, endColumn: 8 }),
+      getOffsetAt: () => 7,
+      getValueInRange: jest.fn(),
+    });
+    const suggestion = (label: string) => ({
+      label,
+      kind: 0,
+      insertText: label,
+      range: { startLineNumber: 1, endLineNumber: 1, startColumn: 8, endColumn: 8 },
+    });
+    const modelA = makeModel();
+    const modelB = makeModel();
+    const fetchA = jest.fn(async () => ({ suggestions: [suggestion('from editor A')] }));
+    const fetchB = jest.fn(async () => ({ suggestions: [suggestion('from editor B')] }));
+    const editorA: any = { updateOptions: jest.fn(), getModel: () => modelA };
+    const editorB: any = { updateOptions: jest.fn(), getModel: () => modelB };
+
+    registerSQL('sql', editorA, fetchA);
+    registerSQL('sql', editorB, fetchB);
+
+    // Monaco asks every provider registered for the language, as it does when both editors are open.
+    const position = { lineNumber: 1, column: 8 };
+    const results = await Promise.all(providers.map((p) => p.provideCompletionItems(modelB, position)));
+
+    expect(results.flatMap((r) => r.suggestions)).toEqual([suggestion('from editor B')]);
+    expect(fetchA).not.toHaveBeenCalled();
+    expect(fetchB).toHaveBeenCalledTimes(1);
+  });
 });

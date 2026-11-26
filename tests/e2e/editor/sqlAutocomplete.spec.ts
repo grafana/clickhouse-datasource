@@ -1,10 +1,15 @@
 // E2E coverage for Monaco autocomplete registration in the SQL editor. Unit
-// tests cover the suggestion providers in isolation; only E2E confirms that
-// remounting SqlEditor in the same document (toggling the editor type) does not
-// re-register completion providers and duplicate every suggestion.
+// tests cover the suggestion providers in isolation; E2E confirms that a
+// SqlEditor remounted in the same document (toggling the editor type) still
+// offers the plugin macros, each once. It does not catch a missing dispose:
+// each provider answers only for its own editor's model, and a disposed
+// editor's getModel() is null, so a leaked provider returns nothing. Unit tests
+// in src/components/SqlEditor.test.tsx and src/components/sqlProvider.test.ts
+// check the dispose instead.
 
 import { expect, test } from '@grafana/plugin-e2e';
 import type { Page } from '@playwright/test';
+import { DATASOURCE_UID, PLUGIN_TYPE, skipFixtureTestsOnCloud } from '../helpers/env';
 import { exploreUrl } from '../helpers/explore';
 
 /**
@@ -39,12 +44,24 @@ function findDuplicates(labels: string[]): string[] {
   return [...dupes];
 }
 
+/** An Explore URL with queries A and B open in the SQL editor, so two SqlEditors are mounted. */
+function exploreUrlWithTwoSqlQueries(): string {
+  const datasource = { type: PLUGIN_TYPE, uid: DATASOURCE_UID };
+  const queries = ['A', 'B'].map((refId) => ({ refId, datasource, editorType: 'sql', pluginVersion: '', rawSql: '' }));
+  const panes = JSON.stringify({
+    explore: { datasource: DATASOURCE_UID, queries, range: { from: 'now-1h', to: 'now' } },
+  });
+  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
+}
+
 /**
- * Remount SqlEditor inside the same document by toggling the editor type.
- * registerSQL registers the completion provider against the global 'sql' language, so only
- * an in-document remount can leave a stale provider answering alongside the new one. A full
- * page navigation tears Monaco down with the rest of the document and always re-registers
- * cleanly, which is why it cannot catch a missing dispose.
+ * Remount SqlEditor inside the same document by toggling the editor type. The test then checks
+ * that the remounted editor still offers the same macros, each once. It cannot catch a missing
+ * dispose: a leaked provider stays registered for the global 'sql' language, but it answers only
+ * for its own editor's model, and a disposed editor's getModel() is null, so it returns nothing.
+ * Unit tests check the dispose: 'disposes Monaco language providers when the editor unmounts' in
+ * SqlEditor.test.tsx and 'disposes the completion and formatting providers when dispose() is
+ * called' in sqlProvider.test.ts.
  */
 async function remountSqlEditor(page: Page) {
   // Close the open suggest widget so the next capture cannot read the previous one.
@@ -99,5 +116,20 @@ test.describe('SQL editor autocomplete', () => {
     const secondMountLabels = await captureMacroLabels(page);
     expect(findDuplicates(secondMountLabels), 'second mount has no duplicate macros').toEqual([]);
     expect(new Set(secondMountLabels)).toEqual(new Set(firstMountLabels));
+  });
+
+  test('lists each table once with two SQL queries open', async ({ page, explorePage }) => {
+    skipFixtureTestsOnCloud('seed.sql');
+    await page.goto(exploreUrlWithTwoSqlQueries());
+
+    // Each SqlEditor registers a completion provider for the shared sql language and Monaco asks
+    // all of them, so an editor that answered for the other editor's model listed every table twice.
+    await explorePage.getQueryEditorRow('B').getByRole('code').click();
+    await page.keyboard.type('SELECT * FROM e2e_test.');
+
+    const labels = page.locator('.monaco-editor .suggest-widget.visible .monaco-list-row .label-name');
+    await expect(labels.filter({ hasText: /^events$/ })).toHaveCount(1);
+    const tables = (await labels.allTextContents()).map((l) => l.trim());
+    expect(findDuplicates(tables), 'no table is listed twice').toEqual([]);
   });
 });
