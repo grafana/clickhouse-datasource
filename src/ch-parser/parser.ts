@@ -105,6 +105,10 @@ export interface SelectQueryNode extends QueryNode {
   // several selects; a single-table target is not meaningful for the whole
   // statement then.
   hasSetOperation?: boolean;
+  // The first top-level SELECT and set operator. `token` is the last SELECT, so in a set operation
+  // these bound the first select, whose select list names the columns.
+  firstSelect?: Token;
+  firstSetOperator?: Token;
 }
 
 // Clause keywords that an unqualified FROM target never takes as the table name.
@@ -219,6 +223,7 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
     node.children!.push({ type: QueryNodeType.Default, token: firstToken, clause: ClauseType.With });
   } else if (firstToken.matchKeyword('SELECT')) {
     node.token = firstToken;
+    node.firstSelect = firstToken;
   } else {
     return null;
   }
@@ -239,6 +244,7 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
     // any other.
     if (parenDepth === 0 && isSetOperator(token, parser.peekAt(0), parser.peekAt(1))) {
       node.hasSetOperation = true;
+      node.firstSetOperator ??= token;
     }
 
     if (token.type === TokenType.Semicolon) {
@@ -247,6 +253,9 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
       endOfNode = true;
     } else if (token.matchKeyword('SELECT')) {
       node.token = token;
+      if (parenDepth === 0) {
+        node.firstSelect ??= token;
+      }
     } else if (token.matchKeyword('FROM') || token.matchKeyword('JOIN')) {
       const fromNode: FromQueryNode = { type: QueryNodeType.From, token, clause: ClauseType.From };
       node.children!.push(fromNode);

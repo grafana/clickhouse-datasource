@@ -465,6 +465,7 @@ describe('Suggestions in queries with CTEs', () => {
   const tableColumns: Record<string, TableColumn[]> = {
     'otel.otel_logs': [column('ServiceName'), column('Body'), column('Timestamp')],
     'telemetry.otel_metrics_histogram': [column('TimeUnix'), column('MetricName'), column('Count')],
+    'default.logs': [column('Severity'), column('Message')],
   };
   const schema: Schema = {
     databases: async () => ['otel', 'telemetry'],
@@ -543,8 +544,39 @@ describe('Suggestions in queries with CTEs', () => {
     expect(first.sortText).toBe('!!!!n');
   });
 
-  it('stops at a CTE that reads from itself', async () => {
-    expect(await labels('WITH x AS (SELECT * FROM x) SELECT * FROM x WHERE |')).toEqual([]);
+  // ClickHouse resolves a CTE that is still being resolved as a table, so the inner `logs` reads the
+  // table `logs`.
+  it('reads the table a CTE names inside its own body', async () => {
+    expect(await labels('WITH logs AS (SELECT * FROM logs) SELECT * FROM logs WHERE |')).toEqual([
+      'Severity',
+      'Message',
+    ]);
+  });
+
+  it('reads the table when two CTEs name each other', async () => {
+    const sql = 'WITH logs AS (SELECT * FROM b), b AS (SELECT * FROM logs) SELECT * FROM logs WHERE |';
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
+  // In a set operation the first select names the columns.
+  it.each([
+    [
+      'its select list',
+      'WITH x AS (SELECT ServiceName AS svc FROM otel.otel_logs UNION ALL SELECT MetricName FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['svc'],
+    ],
+    [
+      'the table its * reads',
+      'WITH x AS (SELECT * FROM otel.otel_logs UNION ALL SELECT * FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['ServiceName', 'Body', 'Timestamp'],
+    ],
+    [
+      'its select list when it has no FROM',
+      'WITH x AS (SELECT 1 AS one UNION ALL SELECT MetricName FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['one'],
+    ],
+  ])('takes the columns of the first select of a UNION in a CTE: %s', async (_label, sql, expected) => {
+    expect(await labels(sql)).toEqual(expected);
   });
 
   describe('in an OTel histogram query built from CTEs', () => {

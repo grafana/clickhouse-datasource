@@ -400,7 +400,7 @@ interface CteColumns {
 }
 
 // The columns a CTE body exposes. `*` is followed through CTEs and FROM subqueries to the tables
-// they read; `seen` stops a CTE that reads from itself.
+// they read. `seen` holds the CTEs being resolved.
 function cteColumns(
   text: string,
   body: SelectQueryNode,
@@ -414,15 +414,21 @@ function cteColumns(
   seen.add(body);
 
   const scope = new Map([...outerScope, ...(body.withAliases ?? [])]);
-  const from = body.from;
-  for (const item of selectListItems(text, body.token.end, from?.token.begin ?? nodeEnd(body))) {
+  // In a UNION or another set operation, the first select names the columns.
+  const select = body.firstSelect ?? body.token;
+  const end = body.firstSetOperator?.begin ?? nodeEnd(body);
+  const from = body.from && body.from.token.begin < end ? body.from : undefined;
+  for (const item of selectListItems(text, select.end, from?.token.begin ?? end)) {
     if (item.outputName) {
       columns.names.push(item.outputName);
     }
     if (!item.wildcard || !from) {
       continue;
     }
-    const source = cteNamedBy(from, scope) ?? from.subquery;
+    // A CTE that is still being resolved names the table there, as in ClickHouse: the inner `logs` of
+    // `WITH logs AS (SELECT * FROM logs)` reads the table.
+    const cte = cteNamedBy(from, scope);
+    const source = (cte && !seen.has(cte) ? cte : undefined) ?? from.subquery;
     if (source) {
       const inner = cteColumns(text, source, scope, seen);
       columns.names.push(...inner.names);
