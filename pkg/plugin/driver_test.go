@@ -828,6 +828,15 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	})
 }
 
+func TestSettingsLongToWideCellLimit(t *testing.T) {
+	config := backend.DataSourceInstanceSettings{
+		JSONData:                []byte(`{"host": "test", "port": 443}`),
+		DecryptedSecureJSONData: map[string]string{},
+	}
+	ds := (&Clickhouse{}).Settings(t.Context(), config)
+	assert.Zero(t, ds.LongToWideCellLimit)
+}
+
 func TestSettingsForwardHeadersWithJWT(t *testing.T) {
 	h := &Clickhouse{}
 

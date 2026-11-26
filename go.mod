@@ -9,7 +9,7 @@ require (
 	github.com/grafana/dsconfig/schema v0.0.13
 	github.com/grafana/grafana-plugin-sdk-go v0.300.0
 	github.com/grafana/macropro v1.1.0
-	github.com/grafana/sqlds/v5 v5.5.0
+	github.com/grafana/sqlds/v5 v5.6.0
 	github.com/moby/moby/api v1.57.0
 	github.com/paulmach/orb v0.14.0
 	github.com/shopspring/decimal v1.6.0

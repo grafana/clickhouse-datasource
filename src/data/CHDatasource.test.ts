@@ -537,7 +537,7 @@ describe('ClickHouseDatasource', () => {
       expect(result.rawSql).toEqual('SELECT * FROM web_by_useragent');
     });
 
-    it('applies a table-qualified key to another table when the table name is hidden from keys', async () => {
+    it('applies a key to every table, read as a column name, when the table name is hidden from keys', async () => {
       const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
 
       jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
@@ -548,7 +548,37 @@ describe('ClickHouseDatasource', () => {
       const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
 
       expect(result.rawSql).toEqual(
-        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}"
+        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' web.client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('keeps a dotted column name whole when the table name is hidden from keys (#2096)', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const filters = [{ key: '__otel_materialized_k8s.cluster.name', operator: '=', value: 'prod' }];
+
+      const automatic = ds.applyTemplateVariables(
+        { rawSql: 'SELECT * FROM otel_logs', editorType: EditorType.SQL } as CHQuery,
+        {},
+        filters
+      );
+      expect(automatic.rawSql).toEqual(
+        "SELECT * FROM otel_logs\nsettings additional_table_filters={'otel_logs' : ' __otel_materialized_k8s.cluster.name = \\'prod\\' '}"
+      );
+
+      const macro = ds.applyTemplateVariables(
+        {
+          rawSql: "SELECT * FROM logs_view settings $__adHocFilters('otel_logs')",
+          editorType: EditorType.SQL,
+        } as CHQuery,
+        {},
+        filters
+      );
+      expect(macro.rawSql).toEqual(
+        "SELECT * FROM logs_view settings additional_table_filters={'otel_logs': ' __otel_materialized_k8s.cluster.name = \\'prod\\' '}"
       );
     });
 
@@ -1932,6 +1962,103 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchSqlFunctions', () => {
+    const countIf = {
+      name: 'countIf',
+      is_aggregate: 1,
+      case_insensitive: 0,
+      alias_to: '',
+      origin: 'System',
+      description: 'Counts the rows that match.',
+      syntax: 'countIf(cond)',
+      arguments: '- `cond`: The condition.',
+      returned_value: 'The number of rows.',
+      examples: 'SELECT countIf(x > 1)',
+      categories: 'Aggregate Functions',
+    };
+
+    it('selects only the columns of system.functions that the server has', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([countIf]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchSqlFunctions();
+
+      const sql = spyOnQuery.mock.calls[0][0].targets[0].rawSql.replace(/\s+/g, ' ').trim();
+      expect(sql).toBe(
+        "SELECT COLUMNS('^(name|is_aggregate|case_insensitive|alias_to|origin|description|syntax|arguments|returned_value|examples|categories)$') FROM system.functions LIMIT 10000"
+      );
+    });
+
+    it('reads every column by its name', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const { categories, ...rest } = countIf;
+      // The same columns in another order than the query names them.
+      const frame = arrayToDataFrame([{ categories, ...rest }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'countIf',
+          isAggregate: true,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Counts the rows that match.',
+          syntax: 'countIf(cond)',
+          arguments: '- `cond`: The condition.',
+          returnedValue: 'The number of rows.',
+          examples: 'SELECT countIf(x > 1)',
+          categories: 'Aggregate Functions',
+        },
+      ]);
+    });
+
+    it('leaves the documentation empty on a server without its columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 23.3.
+      const frame = arrayToDataFrame([
+        { name: 'plus', is_aggregate: 0, case_insensitive: 0, alias_to: '', origin: 'System', description: 'Adds.' },
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'plus',
+          isAggregate: false,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Adds.',
+          syntax: '',
+          arguments: '',
+          returnedValue: '',
+          examples: '',
+          categories: '',
+        },
+      ]);
+    });
+
+    it('takes every function for a system function on a server without the origin column', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 21.8.
+      const frame = arrayToDataFrame([{ name: '__getScalar', is_aggregate: 0, case_insensitive: 0, alias_to: '' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const [fn] = await ds.fetchSqlFunctions();
+
+      expect(fn.origin).toBe('System');
+      expect(fn.description).toBe('');
+    });
+
+    it('returns no functions when the query fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([]);
+    });
+  });
+
   describe('getMetricTableFeatures', () => {
     it('reports a failed DESC TABLE instead of guessing the attribute layout, and reads again next time', async () => {
       const ds = cloneDeep(mockDatasource);
@@ -2275,6 +2402,99 @@ describe('ClickHouseDatasource', () => {
       // string in the same shape it arrived in.
       const labels = frame.fields.find((f) => f.name === 'labels')!.values[0];
       expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
+    });
+
+    // On Grafana 12.4 and later, log details drop plain fields when every label of a row is in a named
+    // group. A SQL logs query that selects the OTel attribute maps gets only grouped labels, so query()
+    // folds its plain columns into `labels` (foldSqlLogFieldsIntoLabels) to keep them in log details.
+    it('folds the plain columns of a SQL logs query with OTel attribute maps into labels', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql:
+          "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, ResourceAttributes['k8s.pod.name'] AS pod, LogAttributes, ResourceAttributes FROM otel.otel_logs",
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+          { name: 'pod', type: FieldType.string, config: {}, values: ['cart-7d9f'] } as Field,
+          {
+            name: 'labels',
+            type: FieldType.other,
+            config: {},
+            values: [{ 'ResourceAttributes.k8s.pod.name': 'cart-7d9f', 'LogAttributes.event.name': 'proxy.access' }],
+          } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      const frame = response.data[0] as DataFrame;
+      expect(frame.fields.map((f) => f.name)).toEqual(['timestamp', 'body', 'level', 'labels']);
+      expect(frame.fields.find((f) => f.name === 'labels')!.values[0]).toEqual({
+        'ResourceAttributes.k8s.pod.name': 'cart-7d9f',
+        'LogAttributes.event.name': 'proxy.access',
+        ServiceName: 'cart',
+        pod: 'cart-7d9f',
+      });
+    });
+
+    it('leaves a SQL logs query without OTel attribute maps as is', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql: 'SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName FROM otel.otel_logs',
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      expect((response.data[0] as DataFrame).fields.map((f) => f.name)).toEqual([
+        'timestamp',
+        'body',
+        'level',
+        'ServiceName',
+      ]);
     });
   });
 

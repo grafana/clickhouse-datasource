@@ -1,4 +1,5 @@
 import { Lexer } from './lexer';
+import { isSetOperator } from './parser';
 import { Token, TokenType } from './types';
 
 /** Why a statement cannot be treated as a single top-level SELECT. Not errors: callers fall back. */
@@ -427,11 +428,18 @@ export function scanTopLevelSelect(sql: string): ScanResult {
 
   const topLevel = significant.filter((e) => e.depth === 0);
 
-  // `format`, `settings` and `EXCEPT` all mean something different before the FROM than after.
+  // A top-level UNION, INTERSECT or EXCEPT combines several selects. isSetOperator tells a
+  // set operator apart from an EXCEPT column modifier or a column named `except`. The
+  // lookahead reads every significant token, not only the top-level ones, so
+  // `EXCEPT (SELECT ...)` sees the SELECT inside the bracket.
+  const hasSetOperation = significant.some(
+    (e, i) => e.depth === 0 && isSetOperator(e.token, significant[i + 1]?.token, significant[i + 2]?.token)
+  );
+
+  // `format` and `settings` mean something different before the FROM than after.
   let selectCount = 0;
   let selectIndex = -1;
   let fromIndex = -1;
-  let hasSetOperation = false;
   let hasExtraStatement = false;
 
   for (let i = 0; i < topLevel.length; i++) {
@@ -443,10 +451,6 @@ export function scanTopLevelSelect(sql: string): ScanResult {
       }
     } else if (token.matchKeyword('FROM') && fromIndex === -1) {
       fromIndex = i;
-    } else if (token.matchKeyword('UNION') || token.matchKeyword('INTERSECT')) {
-      hasSetOperation = true;
-    } else if (token.matchKeyword('EXCEPT') && fromIndex !== -1) {
-      hasSetOperation = true;
     } else if (token.type === TokenType.Semicolon && i !== topLevel.length - 1) {
       hasExtraStatement = true;
     }

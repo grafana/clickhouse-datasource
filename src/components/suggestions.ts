@@ -146,8 +146,30 @@ export async function getSuggestions(
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
 
-  const results = await getSuggestionsFromCursorData(cursorData, schema, range);
+  const results = await getSuggestionsFromCursorData(
+    cursorData,
+    schema,
+    range,
+    typedVariableStart(text, cursorPosition)
+  );
   return dedupeSuggestions(results);
+}
+
+/**
+ * How much of a variable reference is typed before the name at the cursor: '$', '${', or nothing.
+ * Monaco treats `$` and `{` as word separators, so they stay in place and the suggestion replaces
+ * only the name typed after them. `closed` is whether a `}` comes right after the cursor, which
+ * closes the variable only after `${`.
+ */
+export interface TypedVariableStart {
+  start: '' | '$' | '${';
+  closed: boolean;
+}
+
+function typedVariableStart(text: string, cursorPosition: number): TypedVariableStart {
+  const match = /(\$\{?)\w*$/.exec(text.substring(0, cursorPosition));
+  const start = !match ? '' : match[1] === '${' ? '${' : '$';
+  return { start, closed: text[cursorPosition] === '}' };
 }
 
 function dedupeSuggestions(items: monacoTypes.languages.CompletionItem[]): monacoTypes.languages.CompletionItem[] {
@@ -166,7 +188,8 @@ function dedupeSuggestions(items: monacoTypes.languages.CompletionItem[]): monac
 async function getSuggestionsFromCursorData(
   data: CursorData,
   schema: Schema,
-  range: Range
+  range: Range,
+  typed: TypedVariableStart = { start: '', closed: false }
 ): Promise<monacoTypes.languages.CompletionItem[]> {
   let results: monacoTypes.languages.CompletionItem[] = [];
 
@@ -220,21 +243,21 @@ async function getSuggestionsFromCursorData(
 
       results = [...databases, ...defaultTables];
       if (typingVariable) {
-        results.push(...(await getVariableSuggestions(range)));
+        results.push(...(await getVariableSuggestions(range, typed)));
       }
       break;
 
     case 'table':
       results = await fetchTableSuggestions(schema, range, db, data.prefix);
       if (typingVariable) {
-        results.push(...(await getVariableSuggestions(range)));
+        results.push(...(await getVariableSuggestions(range, typed)));
       }
       break;
 
     case 'column':
       const macros = await getMacroSuggestions(range, data.prefix);
       results.push(...macros);
-      const variables = await getVariableSuggestions(range);
+      const variables = await getVariableSuggestions(range, typed);
       results.push(...variables);
 
       // After a bare `$` Monaco has an empty word to match on, because `$` is a word
@@ -372,7 +395,7 @@ async function fetchFunctionSuggestions(schema: Schema, range: Range) {
   }));
 }
 
-export function getVariableSuggestions(range: Range) {
+export function getVariableSuggestions(range: Range, typed: TypedVariableStart = { start: '', closed: false }) {
   const templateSrv = getTemplateSrv();
   if (!templateSrv) {
     return [];
@@ -380,13 +403,21 @@ export function getVariableSuggestions(range: Range) {
   return templateSrv.getVariables().map((variable) => {
     const label = `\${${variable.name}}`;
     const val = templateSrv.replace(label);
+    // Only what is not typed yet, so picking `${service}` after `$` doesn't give `$${service}`.
+    // After a bare `$` a `}` at the cursor closes something else, as in `{'a': $}`, so the insert
+    // brings its own. After `${` it is the one the editor added when `{` was typed.
+    const closing = typed.start === '${' && typed.closed ? '' : '}';
+    const insertText =
+      typed.start === '${' ? `${variable.name}${closing}` : typed.start === '$' ? `{${variable.name}${closing}` : label;
     return {
       label,
       detail: `(Template Variable) ${val}`,
       kind: monaco.languages.CompletionItemKind.Variable,
+      // Monaco matches the word after `$` or `${`, which is part of the name.
+      filterText: variable.name,
       sortText: `!!!${label}`,
       documentation: `(Template Variable) ${val}`,
-      insertText: `\${${variable.name}}`,
+      insertText,
       range,
     };
   });

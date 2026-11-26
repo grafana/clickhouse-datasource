@@ -138,7 +138,11 @@ function isTableNameToken(token: Token, allowReserved: boolean): boolean {
 // (`SELECT * EXCEPT (secret) FROM t`), so each counts only when what follows
 // starts another select: SELECT, WITH, ALL / DISTINCT, or `(` and then SELECT or
 // WITH.
-function isSetOperator(token: Token | undefined, next: Token | undefined, afterNext: Token | undefined): boolean {
+export function isSetOperator(
+  token: Token | undefined,
+  next: Token | undefined,
+  afterNext: Token | undefined
+): boolean {
   if (!['UNION', 'INTERSECT', 'EXCEPT'].some((keyword) => token?.matchKeyword(keyword))) {
     return false;
   }
