@@ -53,6 +53,11 @@ const templateWordRegex = /(?:\w|\$\{[^}]*\}|\$|\[\[\w+(?::\w+)?\]\])+/g;
 // and puts a space between them, so these strings get placeholders like here-documents.
 const hexOrBinaryStringRegex = /^[xb]'/i;
 
+// ClickHouse reads a word that starts with a digit as a name, and so does the plugin's lexer, as in
+// the interval of $__timeGroup(ts, 5m). The formatter can't parse such a word and gives up on the
+// whole query, so these words get placeholders too.
+const digitWordRegex = /^\d/;
+
 // ClickHouse nests block comments, and so does the plugin's lexer: `/* a /* b */ c */` is one
 // comment token, so a block comment that holds another `/*` nests. The formatter ends a block
 // comment at the first `*/` instead, which turns the end of this one into `c * /`. It doesn't
@@ -121,7 +126,8 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
     }
     if (
       token.type === TokenType.HereDoc ||
-      (token.type === TokenType.StringLiteral && hexOrBinaryStringRegex.test(text))
+      (token.type === TokenType.StringLiteral && hexOrBinaryStringRegex.test(text)) ||
+      (token.type === TokenType.BareWord && digitWordRegex.test(text))
     ) {
       flushCode();
       sql += placeholder(text, false);

@@ -88,6 +88,32 @@ describe('SQL Formatter', () => {
     expect(formatSql(input, 2)).toBe(expected);
   });
 
+  it('keeps a bare interval in a macro', () => {
+    const input =
+      'SELECT $__timeGroup(Timestamp, 5m) AS time, count() FROM t WHERE $__timeFilter(Timestamp) GROUP BY time';
+    const expected =
+      'SELECT\n  $__timeGroup(Timestamp, 5m) AS time,\n  count()\nFROM\n  t\nWHERE\n  $__timeFilter(Timestamp)\nGROUP BY\n  time';
+
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
+  it.each([
+    [
+      'a compound duration',
+      'SELECT $__timeGroup(ts, 1h30m) AS time FROM t',
+      'SELECT\n  $__timeGroup(ts, 1h30m) AS time\nFROM\n  t',
+    ],
+    [
+      'the interval in $__fromGrafanaInterval',
+      'SELECT toStartOfInterval(ts, INTERVAL $__fromGrafanaInterval(500ms)) AS time FROM t',
+      'SELECT\n  toStartOfInterval(\n    ts,\n    INTERVAL $__fromGrafanaInterval(500ms)\n  ) AS time\nFROM\n  t',
+    ],
+    ['a name that starts with a digit', 'SELECT 5m, t.1h AS x FROM t', 'SELECT\n  5m,\n  t.1h AS x\nFROM\n  t'],
+    ['a digit word joined to a variable', 'SELECT 5m_${env} FROM t', 'SELECT\n  5m_${env}\nFROM\n  t'],
+  ])('keeps %s intact', (_label, input, expected) => {
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
   it('returns a query it cannot format unchanged', () => {
     const input = "SELECT 'unterminated FROM t";
 
