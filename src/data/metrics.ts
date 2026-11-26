@@ -195,13 +195,11 @@ const getVariableFilterSql = (filter: Filter, label: MetricLabel, jsonAttributes
 /**
  * A filter value the user typed or picked, as SQL. The builder renders values holding parentheses
  * or quotes unquoted, which turns a picked value like `Linux 6.1 (amd64)` into a syntax error, so
- * label values are quoted here. A value naming a dashboard variable stays unquoted, so it
- * interpolates like the rest of the builder.
+ * label values are quoted here. Grafana interpolates variables inside quotes too, and a value
+ * holding a `$`, such as `prod-$env`, is a plain value, so nothing is left unquoted.
  */
-const getLabelFilterValueSql = (value: unknown): string => {
-  const text = typeof value === 'string' ? value : String(value ?? '');
-  return /\$\w|\$\{|\[\[/.test(text) ? text : quoteString(text);
-};
+const getLabelFilterValueSql = (value: unknown): string =>
+  quoteString(typeof value === 'string' ? value : String(value ?? ''));
 
 /**
  * A label filter with a typed or picked value, as SQL. Operators that wrap the value themselves,

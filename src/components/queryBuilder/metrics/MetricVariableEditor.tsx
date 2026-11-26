@@ -5,6 +5,7 @@ import {
   getMetricFilterDisplayName,
   getMetricLabelId,
   metricColumnLabels,
+  MetricTableFeatures,
   MetricTables,
   parseMetricLabelId,
 } from 'data/metrics';
@@ -48,9 +49,10 @@ const label = (text: string, tooltip: string) => (
  */
 export const MetricVariableEditor = ({ datasource, query, onChange }: Props) => {
   const database = datasource.getDefaultMetricsDatabase();
-  const tables = useMetricTables(datasource);
+  const tables = useMetricTables(datasource, 0);
   const catalog = useMetricCatalog(datasource, '', 0);
   const [showFilterEditor, setShowFilterEditor] = useState(false);
+  const [pickError, setPickError] = useState<string>();
   const metricTable = query.metricType ? tables.value[query.metricType] || '' : '';
   const labelKeys = useMetricLabelKeys(
     datasource,
@@ -91,15 +93,24 @@ export const MetricVariableEditor = ({ datasource, query, onChange }: Props) => 
 
   const onMetricChange = async (option: ComboboxOption<string> | null) => {
     if (!option) {
+      setPickError(undefined);
       onChange({ metricName: undefined, metricType: undefined, metricTables: getVariableTables(tables.value) });
       return;
     }
     const separator = option.value.indexOf(':');
     const metricType = option.value.slice(0, separator) as MetricType;
     const metricTables = getVariableTables(tables.value, metricType);
-    const features = metricTables[0]
-      ? await datasource.getMetricTableFeatures(database, metricTables[0]).catch(() => ({ jsonAttributes: false }))
-      : { jsonAttributes: false };
+    let features: MetricTableFeatures = {};
+    if (metricTables[0]) {
+      try {
+        features = await datasource.getMetricTableFeatures(database, metricTables[0]);
+      } catch (error) {
+        // A guessed attribute layout reads the wrong column of the table, so nothing is picked.
+        setPickError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+    }
+    setPickError(undefined);
     onChange({
       metricName: option.value.slice(separator + 1),
       metricType,
@@ -120,6 +131,11 @@ export const MetricVariableEditor = ({ datasource, query, onChange }: Props) => 
       {catalog.error && (
         <Alert severity="error" title="Could not list the metrics">
           {catalog.error}
+        </Alert>
+      )}
+      {pickError && (
+        <Alert severity="error" title="Could not read the columns of the metric table">
+          {pickError}
         </Alert>
       )}
       <InlineField label={label('Metric', 'Optional. Without a metric, every metric table is read.')}>

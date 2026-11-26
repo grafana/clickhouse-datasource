@@ -47,8 +47,8 @@ const emptyLabels: MetricLabel[] = [];
 const emptyQuantiles: number[] = [];
 
 /** The metric tables that exist in the configured metrics database. */
-export const useMetricTables = (datasource: Datasource) =>
-  useAsync(`${datasource.uid}`, emptyTables, () => datasource.resolveMetricTables());
+export const useMetricTables = (datasource: Datasource, reloadKey: number) =>
+  useAsync(`${datasource.uid}:${reloadKey}`, emptyTables, () => datasource.resolveMetricTables());
 
 /**
  * The metrics with data in the last 6 hours of the dashboard time range, so a long range does not

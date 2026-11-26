@@ -194,8 +194,9 @@ SELECT
     toFloat64(60 * number) AS Value
 FROM numbers(10);
 
--- http.server.duration: cumulative histogram with bounds 100, 250 and 500ms. Each
--- minute adds 30, 15, 4 and 1 observations to the four buckets, 50 in total.
+-- http.server.duration: a cumulative histogram with bounds 100, 250 and 500ms. Each minute adds
+-- 30, 15, 4 and 1 observations to the four buckets, 50 in total, so BucketCounts holds one count
+-- per bucket and its sum is Count.
 INSERT INTO e2e_test.otel_metrics_histogram
 SELECT
     map('service.name', 'api', 'service.instance.id', 'api-1') AS ResourceAttributes,
@@ -211,7 +212,7 @@ SELECT
     2 AS AggregationTemporality,
     toUInt64(50 * (number + 1)) AS Count,
     toFloat64(900 * (number + 1) + 10 * number) AS Sum,
-    arrayMap(x -> x * (number + 1), [30., 45., 49., 50.]) AS BucketCounts,
+    arrayMap(x -> x * (number + 1), [30., 15., 4., 1.]) AS BucketCounts,
     [100., 250., 500.] AS ExplicitBounds,
     toFloat64(5) AS Min,
     toFloat64(900) AS Max

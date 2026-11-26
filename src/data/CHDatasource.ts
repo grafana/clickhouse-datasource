@@ -1473,7 +1473,16 @@ export class Datasource
 
   /** The optional features of a metric table, such as JSON attribute columns. */
   async getMetricTableFeatures(database: string, table: string): Promise<MetricTableFeatures> {
-    return getMetricTableFeatures(await this.getColumnsCached(database, table));
+    const columns = await this.getColumnsCached(database, table);
+    // A failed DESC TABLE resolves with no columns, which reads as a table without an attribute
+    // column, so it is reported instead. The empty list is not kept, so the next pick reads again.
+    if (columns.length === 0) {
+      this._columnCache.delete(this.columnCacheKey(database, table));
+      throw new Error(
+        `Could not read the columns of ${table}. Check that the table exists and that the account can read it.`
+      );
+    }
+    return getMetricTableFeatures(columns);
   }
 
   /** The attribute keys a metric has, by source. Empty when key discovery is turned off. */

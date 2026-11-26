@@ -217,8 +217,13 @@ test.describe('Single-table metrics in Explore', () => {
 
     const frame = frames(body)[0];
     expect(frame?.schema?.fields?.[1]?.name).toBe(SUM_METRIC);
-    // 60s of CPU time per minute is a rate of 1 per second in every bucket that has two points.
-    expect(values(frame).length).toBeGreaterThan(0);
+    // 60s of CPU time per minute is a rate of 1 per second at every point, so a rate that reads
+    // the wrong points, or that divides by the wrong number of seconds, shows up here.
+    const returned = values(frame);
+    expect(returned.length).toBeGreaterThan(0);
+    for (const value of returned) {
+      expect(value).toBeCloseTo(1);
+    }
   });
 
   test('a histogram query returns its default quantile', async ({ page }) => {
@@ -235,12 +240,12 @@ test.describe('Single-table metrics in Explore', () => {
 
     const frame = frames(body)[0];
     expect(frame?.schema?.fields?.[1]?.name).toBe(`${HISTOGRAM_METRIC} p95`);
-    // The fixture's bounds are 100, 250 and 500ms and its p95 falls into the last one.
+    // The fixture adds 30, 15, 4 and 1 observations to the buckets bounded by 100, 250 and 500ms,
+    // so p95 needs 47.5 of the 50 and interpolates inside 250-500ms: 250 + 250 * (47.5 - 45) / 4.
     const returned = values(frame);
     expect(returned.length).toBeGreaterThan(0);
     for (const value of returned) {
-      expect(value).toBeGreaterThan(250);
-      expect(value).toBeLessThanOrEqual(500);
+      expect(value).toBeCloseTo(406.25);
     }
   });
 

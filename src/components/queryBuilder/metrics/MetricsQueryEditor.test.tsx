@@ -273,7 +273,34 @@ describe('MetricsQueryEditor', () => {
     expect(screen.getByText('no series')).toBeInTheDocument();
   });
 
-  it('shows a failed attribute probe when a metric is picked', async () => {
+  it('reloads the metric tables and the metric list when the reload button is pressed', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: '',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: '',
+        type: MetricType.Gauge,
+        fn: MetricFunction.Avg,
+        aggregation: MetricSeriesAggregation.Avg,
+        groupBy: [],
+      },
+    };
+    const datasource = createDatasource();
+    renderEditor(options, datasource);
+    await waitFor(() => expect(screen.getByPlaceholderText('Search 2 metrics')).toBeInTheDocument());
+    const tables = datasource.resolveMetricTables as jest.Mock;
+    const catalog = datasource.fetchMetricCatalog as jest.Mock;
+    expect(tables).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByLabelText('Reload the metric list'));
+
+    // Both lookups rerun, so the tables of a metric type a reload discovers reach the editor too.
+    await waitFor(() => expect(tables).toHaveBeenCalledTimes(2));
+    expect(catalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the query and shows the failure when the attribute probe fails', async () => {
     const options: QueryBuilderOptions = {
       database: 'otel',
       table: '',
@@ -288,7 +315,7 @@ describe('MetricsQueryEditor', () => {
     };
     const datasource = createDatasource();
     (datasource.getMetricTableFeatures as jest.Mock).mockRejectedValue(new Error('no columns'));
-    renderEditor(options, datasource);
+    const { onQueryChange, onRunQuery } = renderEditor(options, datasource);
     const picker = screen.getByTestId(editorSelectors.metricPicker).querySelector('input')!;
     await waitFor(() => expect(picker).toHaveAttribute('placeholder', 'Search 2 metrics'));
 
@@ -297,6 +324,12 @@ describe('MetricsQueryEditor', () => {
 
     await waitFor(() => expect(screen.getByText('Could not read the columns of the metric table')).toBeInTheDocument());
     expect(screen.getByText('no columns')).toBeInTheDocument();
+    // Guessing the attribute layout would save a query that reads the wrong column, so the pick is
+    // dropped: the query keeps its empty metric and nothing runs.
+    expect(
+      onQueryChange.mock.calls.some(([next]) => (next as QueryBuilderOptions).metric?.name === 'http.server.requests')
+    ).toBe(false);
+    expect(onRunQuery).not.toHaveBeenCalled();
   });
 
   it('opens the label filter editor', async () => {

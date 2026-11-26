@@ -1932,6 +1932,24 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('getMetricTableFeatures', () => {
+    it('reports a failed DESC TABLE instead of guessing the attribute layout, and reads again next time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchColumns = jest.spyOn(ds, 'fetchColumns').mockResolvedValueOnce([]);
+
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).rejects.toThrow('otel_metrics_gauge');
+
+      // The empty list was not kept, so asking again reads the schema instead of the failure.
+      fetchColumns.mockResolvedValueOnce([
+        { name: 'Attributes', type: 'JSON', label: 'Attributes', picklistValues: [] },
+      ]);
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).resolves.toEqual({
+        jsonAttributes: true,
+      });
+      expect(fetchColumns).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('fetchJSONPathColumns', () => {
     const schema: TableColumn[] = [
       { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },

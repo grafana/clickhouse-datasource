@@ -206,7 +206,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
   const [reloadKey, setReloadKey] = useState(0);
   const [showFilterEditor, setShowFilterEditor] = useState(false);
 
-  const tables = useMetricTables(datasource);
+  const tables = useMetricTables(datasource, reloadKey);
   const catalog = useMetricCatalog(datasource, rangeKey, reloadKey);
   const labelKeys = useMetricLabelKeys(
     datasource,
@@ -308,15 +308,16 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
       isMonotonic: false,
     };
     const table = tables.value[type] ?? datasource.getConfiguredMetricTables()[type];
-    let features: MetricTableFeatures = {};
+    let features: MetricTableFeatures;
     try {
       features = await datasource.getMetricTableFeatures(database, table);
     } catch (error) {
       // Assuming a plain String column would read an attribute column as JSON, or the other way
-      // around, so the failure is shown instead of silently picking one.
+      // around, so the pick is dropped and the failure shown instead of saving a guess.
       if (pick === lastPick.current) {
         setPickError(error instanceof Error ? error.message : String(error));
       }
+      return;
     }
     const jsonAttributes = Boolean(features.jsonAttributes);
     const [labels, reportedQuantiles, metricHealth] = await Promise.all([
@@ -481,12 +482,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
               />
             </div>
           </InlineField>
-          <IconButton
-            name="sync"
-            tooltip="Reload the metric list"
-            aria-label="Reload metrics"
-            onClick={() => setReloadKey((key) => key + 1)}
-          />
+          <IconButton name="sync" tooltip="Reload the metric list" onClick={() => setReloadKey((key) => key + 1)} />
           {metric.name && (
             <Badge
               color={metric.type === MetricType.Gauge ? 'blue' : metric.type === MetricType.Sum ? 'green' : 'purple'}
