@@ -31,16 +31,16 @@ func TestClickHouseException(t *testing.T) {
 			wantMessage: "Database otle does not exist. Maybe you meant otel?",
 		},
 		{
-			name:        "HTTP protocol response body",
-			err:         errors.New(`sendQuery: [HTTP 404] response body: "Code: 60. DB::Exception: Table otel.otel_logz does not exist. Maybe you meant otel.otel_logs?. (UNKNOWN_TABLE) (version 26.10.3.7 (official build))` + "\n\""),
+			name:        "HTTP protocol exception",
+			err:         fmt.Errorf("sendQuery: %w", &clickhouse.HTTPError{StatusCode: 404, Err: &clickhouse.Exception{Code: 60, Message: "Table otel.otel_logz does not exist. Maybe you meant otel.otel_logs?"}}),
 			wantCode:    60,
 			wantMessage: "Table otel.otel_logz does not exist. Maybe you meant otel.otel_logs?",
 		},
 		{
-			name:        "HTTP protocol response body without a hint",
-			err:         errors.New(`[HTTP 404] response body: "Code: 81. DB::Exception: Database otle does not exist. (UNKNOWN_DATABASE) (version 26.3.2.3 (official build))"`),
-			wantCode:    81,
-			wantMessage: "Database otle does not exist",
+			name:        "HTTP response the driver could not parse",
+			err:         &clickhouse.HTTPError{StatusCode: 502, Err: errors.New(`response body: "Bad Gateway"`)},
+			wantCode:    0,
+			wantMessage: `[HTTP 502] response body: "Bad Gateway"`,
 		},
 		{
 			name:        "error without an exception",
@@ -66,6 +66,6 @@ func TestQuoteIdentifier(t *testing.T) {
 }
 
 func TestCheckSingleSourceTableWithoutTable(t *testing.T) {
-	assert.Nil(t, checkSingleSourceTable(context.Background(), nil, &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"}))
+	assert.Nil(t, checkSingleSourceTable(context.Background(), nil, &SourceTable{Database: "otel", Table: "otel_logs"}))
 	assert.Nil(t, checkSingleSourceTable(context.Background(), nil, nil))
 }

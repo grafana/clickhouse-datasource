@@ -591,31 +591,32 @@ func TestLoadSettingsSingleSourceTable(t *testing.T) {
 		name     string
 		jsonData string
 		want     *SourceTable
+		wantErr  string
 	}{
 		{
 			name:     "logs table and database",
 			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": "otel", "defaultTable": "otel_logs" }`,
-			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+			want:     &SourceTable{Database: "otel", Table: "otel_logs"},
 		},
 		{
 			name:     "traces table and database",
 			jsonData: `"configMode": "single-table", "signalType": "traces", "traces": { "defaultDatabase": "otel", "defaultTable": "otel_traces" }`,
-			want:     &SourceTable{Signal: "traces", Database: "otel", Table: "otel_traces"},
+			want:     &SourceTable{Database: "otel", Table: "otel_traces"},
 		},
 		{
 			name:     "falls back to the default database and table of the data source",
 			jsonData: `"configMode": "single-table", "signalType": "logs", "defaultDatabase": "otel", "defaultTable": "otel_logs", "logs": {}`,
-			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+			want:     &SourceTable{Database: "otel", Table: "otel_logs"},
 		},
 		{
 			name:     "falls back to the database named default",
 			jsonData: `"configMode": "single-table", "signalType": "traces", "traces": { "defaultTable": "otel_traces" }`,
-			want:     &SourceTable{Signal: "traces", Database: "default", Table: "otel_traces"},
+			want:     &SourceTable{Database: "default", Table: "otel_traces"},
 		},
 		{
 			name:     "a signal type without a configuration mode is single source",
 			jsonData: `"signalType": "logs", "logs": { "defaultDatabase": "otel", "defaultTable": "otel_logs" }`,
-			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+			want:     &SourceTable{Database: "otel", Table: "otel_logs"},
 		},
 		{
 			name:     "all databases mode keeps its defaults out of the check",
@@ -633,12 +634,45 @@ func TestLoadSettingsSingleSourceTable(t *testing.T) {
 			name:     "a malformed section is ignored",
 			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": "otel_logs"`,
 		},
+		{
+			name:     "a configuration mode that is not a string",
+			jsonData: `"configMode": 1, "signalType": "logs", "logs": { "defaultTable": "otel_logs" }`,
+			wantErr:  "could not parse configMode value: expected a string, got float64",
+		},
+		{
+			name:     "a signal type that is not a string",
+			jsonData: `"configMode": "single-table", "signalType": true`,
+			wantErr:  "could not parse signalType value: expected a string, got bool",
+		},
+		{
+			name:     "a default database that is not a string",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": 7, "defaultTable": "otel_logs" }`,
+			wantErr:  "logs settings: could not parse defaultDatabase value: expected a string, got float64",
+		},
+		{
+			name:     "a default table that is not a string",
+			jsonData: `"configMode": "single-table", "signalType": "traces", "traces": { "defaultTable": 2026 }`,
+			wantErr:  "traces settings: could not parse defaultTable value: expected a string, got float64",
+		},
+		{
+			name:     "a data source default table that is not a string",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "defaultTable": ["otel_logs"], "logs": {}`,
+			wantErr:  "could not parse defaultTable value: expected a string, got []interface {}",
+		},
+		{
+			name:     "all databases mode reads no signal settings",
+			jsonData: `"configMode": "classic", "signalType": "logs", "logs": { "defaultTable": 2026 }`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
 				JSONData: []byte(fmt.Sprintf(`{ "host": "test", "port": 9000, %s }`, tt.jsonData)),
 			})
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, settings.SingleSourceTable)
 		})

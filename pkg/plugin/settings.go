@@ -101,8 +101,6 @@ type Settings struct {
 
 // SourceTable is a database and table the data source is configured to read.
 type SourceTable struct {
-	// Signal is the signal type the table holds: "logs" or "traces".
-	Signal   string
 	Database string
 	Table    string
 }
@@ -351,7 +349,9 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
-	settings.SingleSourceTable = singleSourceTable(jsonData, settings.DefaultDatabase)
+	if settings.SingleSourceTable, err = singleSourceTable(jsonData, settings.DefaultDatabase); err != nil {
+		return settings, err
+	}
 
 	return settings, settings.isValid()
 }
@@ -360,20 +360,32 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 // (getConfigMode and getSingleTableLocation): the signal's default database and table, falling
 // back to the data source's default database and table, and to the database "default". It
 // returns nil in All databases mode, for a signal type other than logs and traces, and when no
-// table is set.
-func singleSourceTable(jsonData map[string]interface{}, defaultDatabase string) *SourceTable {
-	configMode, _ := jsonData["configMode"].(string)
-	signal, _ := jsonData["signalType"].(string)
+// table is set, and an error when one of these settings is not a string.
+func singleSourceTable(jsonData map[string]interface{}, defaultDatabase string) (*SourceTable, error) {
+	configMode, err := stringSetting(jsonData, "configMode")
+	if err != nil {
+		return nil, err
+	}
+	signal, err := stringSetting(jsonData, "signalType")
+	if err != nil {
+		return nil, err
+	}
 	if configMode == "" && signal != "" {
 		configMode = "single-table"
 	}
 	if configMode != "single-table" || (signal != "logs" && signal != "traces") {
-		return nil
+		return nil, nil
 	}
 
 	section, _ := jsonData[signal].(map[string]interface{})
-	database, _ := section["defaultDatabase"].(string)
-	table, _ := section["defaultTable"].(string)
+	database, err := stringSetting(section, "defaultDatabase")
+	if err != nil {
+		return nil, fmt.Errorf("%s settings: %w", signal, err)
+	}
+	table, err := stringSetting(section, "defaultTable")
+	if err != nil {
+		return nil, fmt.Errorf("%s settings: %w", signal, err)
+	}
 	if database == "" {
 		database = defaultDatabase
 	}
@@ -381,12 +393,14 @@ func singleSourceTable(jsonData map[string]interface{}, defaultDatabase string) 
 		database = "default"
 	}
 	if table == "" {
-		table, _ = jsonData["defaultTable"].(string)
+		if table, err = stringSetting(jsonData, "defaultTable"); err != nil {
+			return nil, err
+		}
 	}
 	if table == "" {
-		return nil
+		return nil, nil
 	}
-	return &SourceTable{Signal: signal, Database: database, Table: table}
+	return &SourceTable{Database: database, Table: table}, nil
 }
 
 // loadHttpHeaders loads secure and plain text headers from the config

@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -18,10 +16,6 @@ const (
 	exceptionCodeUnknownTable    int32 = 60 // UNKNOWN_TABLE
 	exceptionCodeUnknownDatabase int32 = 81 // UNKNOWN_DATABASE
 )
-
-// httpException matches the server's exception in an error of the HTTP transport, which carries
-// the response body: "Code: 60. DB::Exception: Table a.b does not exist. (UNKNOWN_TABLE) (version ...)".
-var httpException = regexp.MustCompile(`Code: (\d+)\. DB::Exception: (.*?)\.? \([A-Z_]+\)`)
 
 // checkSingleSourceTable runs in the health check after the connection check. A Single source
 // data source reads one table, so a database or table that doesn't exist fails every query while
@@ -62,19 +56,14 @@ func describeTable(ctx context.Context, db *sql.DB, source *SourceTable) error {
 	return rows.Err()
 }
 
-// clickHouseException returns the code and message of the server exception behind err, from
-// the exception of the native protocol or the response body of the HTTP protocol. The code is 0
-// and the message is the error text when err carries no exception.
+// clickHouseException returns the code and message of the server exception behind err. The driver
+// returns a *clickhouse.Exception for the native protocol, and for the HTTP protocol an *HTTPError
+// that unwraps to one when it can parse the response body. The code is 0 and the message is the
+// error text when err carries no exception.
 func clickHouseException(err error) (int32, string) {
 	var exception *clickhouse.Exception
 	if errors.As(err, &exception) {
 		return exception.Code, exception.Message
-	}
-	if match := httpException.FindStringSubmatch(err.Error()); match != nil {
-		code, parseErr := strconv.ParseInt(match[1], 10, 32)
-		if parseErr == nil {
-			return int32(code), match[2]
-		}
 	}
 	return 0, err.Error()
 }
