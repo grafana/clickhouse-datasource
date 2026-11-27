@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { QueryEditorProps } from '@grafana/data';
+import React, { useEffect, useRef } from 'react';
+import { PanelData, QueryEditorProps } from '@grafana/data';
 import { CodeEditor, InlineFieldRow, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
@@ -15,8 +15,30 @@ import { pluginVersion } from 'utils/version';
 import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider';
 import { QueryToolbox } from './QueryToolbox';
 import { MinIntervalEditor } from './MinIntervalEditor';
+import { getRunErrorMarkers } from './sqlErrorMarker';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
+
+// Kept apart from the 'clickhouse' owner of the as-you-type validation, so each clears only its own markers.
+const queryErrorOwner = 'clickhouse-query-error';
+
+function showQueryErrors(
+  editor: monacoTypes.editor.IStandaloneCodeEditor | null,
+  monaco: typeof monacoTypes | null,
+  data: PanelData | undefined,
+  refId: string
+) {
+  const model = editor?.getModel();
+  if (!editor || !monaco || !model) {
+    return;
+  }
+  const markers = getRunErrorMarkers(data, refId, editor.getValue()).map((marker) => ({
+    ...marker,
+    severity: monaco.MarkerSeverity.Error,
+    source: 'ClickHouse',
+  }));
+  monaco.editor.setModelMarkers(model, queryErrorOwner, markers);
+}
 
 function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
   const container = editor.getDomNode();
@@ -36,6 +58,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 export const SqlEditor = (props: SqlEditorProps) => {
   const { query, onChange, onRunQuery, datasource } = props;
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof monacoTypes | null>(null);
   const disposeRegistrationRef = useRef<(() => void) | null>(null);
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
@@ -77,8 +100,22 @@ export const SqlEditor = (props: SqlEditorProps) => {
     }
   };
 
+  // Show where the last run failed, for example after Run Query, and again when new results arrive.
+  useEffect(() => {
+    showQueryErrors(editorRef.current, monacoRef.current, props.data, query.refId);
+  }, [props.data, query.refId]);
+
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    showQueryErrors(editor, monaco, props.data, query.refId);
+    // The marker belongs to the SQL that ran, so it goes away as soon as the text changes.
+    editor.onDidChangeModelContent(() => {
+      const model = editor.getModel();
+      if (model) {
+        monaco.editor.setModelMarkers(model, queryErrorOwner, []);
+      }
+    });
     const registration = registerSQL('sql', editor, _getSuggestions);
     disposeRegistrationRef.current = registration.dispose;
     setupAutoSize(editor);
@@ -106,6 +143,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     disposeRegistrationRef.current?.();
     disposeRegistrationRef.current = null;
     editorRef.current = null;
+    monacoRef.current = null;
   };
   const triggerFormat = () => {
     if (editorRef.current !== null) {
