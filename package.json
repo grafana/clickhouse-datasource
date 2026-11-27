@@ -93,7 +93,7 @@
     "@grafana/schema": "13.1.1",
     "@grafana/ui": "13.1.1",
     "@openfeature/web-sdk": "^1.7.3",
-    "pgsql-ast-parser": "^12.0.1",
+    "pgsql-ast-parser": "12.0.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "sql-formatter": "^15.6.12"
