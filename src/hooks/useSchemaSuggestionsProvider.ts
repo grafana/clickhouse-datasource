@@ -7,6 +7,7 @@ export interface SchemaCache {
   functions: SqlFunction[] | null;
   databases: string[] | null;
   tables: Map<string, string[]>;
+  mapKeys: Map<string, Promise<string[]>>;
 }
 
 function defaultSchemaCache(): SchemaCache {
@@ -14,6 +15,7 @@ function defaultSchemaCache(): SchemaCache {
     functions: null,
     databases: null,
     tables: new Map<string, string[]>(),
+    mapKeys: new Map<string, Promise<string[]>>(),
   };
 }
 
@@ -55,11 +57,27 @@ export function useSchemaSuggestionsProvider(datasource: Datasource): Schema {
     return cache.current.tables.get(db)!;
   }
 
+  // The promise is cached, so the keystrokes of one key share a single probe query.
+  function fetchMapKeys(db: string, table: string, column: string) {
+    const key = JSON.stringify([db, table, column]);
+    let keys = cache.current.mapKeys.get(key);
+    if (!keys) {
+      keys = datasource.fetchUniqueMapKeys(column, db, table).catch(() => {
+        // Try again the next time suggestions open.
+        cache.current.mapKeys.delete(key);
+        return [];
+      });
+      cache.current.mapKeys.set(key, keys);
+    }
+    return keys;
+  }
+
   return {
     functions: fetchFunctions,
     databases: fetchDatabases,
     tables: fetchTables,
     columns: (db, table) => datasource.getEditorColumnsCached(db, table),
+    mapKeys: fetchMapKeys,
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 }

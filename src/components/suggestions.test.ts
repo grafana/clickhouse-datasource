@@ -460,6 +460,118 @@ describe('Suggestions for JSON path columns (#2193)', () => {
   });
 });
 
+describe('Suggestions for Map keys', () => {
+  const column = (name: string, type: string): TableColumn => ({ name, label: name, type, picklistValues: [] });
+  const mapKeys = jest.fn(async (_db: string, _table: string, mapColumn: string) =>
+    mapColumn === 'LogAttributes' ? ['service.name', 'http.status_code', "it's", 'back\\slash'] : ['host.name']
+  );
+  const schema: Schema = {
+    databases: async () => ['otel'],
+    tables: async () => ['otel_logs'],
+    columns: async () => [
+      column('Timestamp', 'DateTime64(9)'),
+      column('Body', 'String'),
+      column('LogAttributes', 'Map(LowCardinality(String), String)'),
+      column('ResourceAttributes', 'Map(LowCardinality(String), String)'),
+      column('Tags', 'Array(String)'),
+    ],
+    functions: async () => [],
+    mapKeys,
+    defaultDatabase: 'otel',
+  };
+
+  const suggest = async (sql: string, cursorPosition = sql.length) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    return getSuggestions(sql, schema, range, cursorPosition, onlyMapKeys);
+  };
+  let onlyMapKeys = false;
+  const keys = (items: Array<{ label: unknown; insertText: string }>) => items.map((s) => [s.label, s.insertText]);
+
+  beforeEach(() => {
+    mapKeys.mockClear();
+    onlyMapKeys = false;
+  });
+
+  it('answers a typed quote with the keys inside a subscript, and with nothing in other strings', async () => {
+    onlyMapKeys = true;
+    expect(await suggest("SELECT count() FROM otel.otel_logs WHERE LogAttributes['")).toHaveLength(4);
+    expect(await suggest("SELECT count() FROM otel.otel_logs WHERE Body = '")).toEqual([]);
+  });
+
+  it("lists the keys of the Map column after `column['`", async () => {
+    const suggestions = await suggest("SELECT count() FROM otel.otel_logs WHERE LogAttributes['");
+
+    expect(keys(suggestions)).toEqual([
+      ['service.name', 'service.name'],
+      ['http.status_code', 'http.status_code'],
+      ["it's", "it\\'s"],
+      ['back\\slash', 'back\\\\slash'],
+    ]);
+    expect(mapKeys).toHaveBeenCalledWith('otel', 'otel_logs', 'LogAttributes');
+  });
+
+  it('lists the keys between the quote and bracket the editor closes automatically', async () => {
+    const sql = "SELECT count() FROM otel.otel_logs WHERE ResourceAttributes['']";
+
+    expect(keys(await suggest(sql, sql.length - 2))).toEqual([['host.name', 'host.name']]);
+  });
+
+  it('filters by the typed key and replaces all of it, dots included', async () => {
+    const sql = "SELECT count() FROM otel.otel_logs WHERE LogAttributes['service.n']";
+    const cursorPosition = sql.length - 2;
+
+    const suggestions = await suggest(sql, cursorPosition);
+
+    expect(keys(suggestions)).toEqual([['service.name', 'service.name']]);
+    expect(suggestions[0].range).toEqual({
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: sql.indexOf("['") + 3,
+      endColumn: cursorPosition + 1,
+    });
+  });
+
+  it('reads a backtick-quoted Map column', async () => {
+    const suggestions = await suggest("SELECT count() FROM otel.otel_logs WHERE `LogAttributes`['ht");
+
+    expect(keys(suggestions)).toEqual([['http.status_code', 'http.status_code']]);
+  });
+
+  it('keeps the usual suggestions for a column that is not a Map', async () => {
+    const suggestions = await suggest("SELECT count() FROM otel.otel_logs WHERE Tags['");
+
+    expect(suggestions.map((s) => s.label)).toContain('Body');
+    expect(mapKeys).not.toHaveBeenCalled();
+  });
+
+  it('keeps the usual suggestions in a value string after a subscript', async () => {
+    const suggestions = await suggest("SELECT count() FROM otel.otel_logs WHERE LogAttributes['service.name'] = '");
+
+    expect(suggestions.map((s) => s.label)).not.toContain('service.name');
+    expect(mapKeys).not.toHaveBeenCalled();
+  });
+
+  it('keeps the usual suggestions outside a subscript', async () => {
+    const suggestions = await suggest('SELECT count() FROM otel.otel_logs WHERE ');
+    const labels = suggestions.map((s) => s.label);
+
+    expect(labels).toEqual(expect.arrayContaining(['Body', 'LogAttributes']));
+    expect(labels).not.toContain('service.name');
+    expect(mapKeys).not.toHaveBeenCalled();
+  });
+});
+
 describe('Suggestions in queries with CTEs', () => {
   const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
   const tableColumns: Record<string, TableColumn[]> = {
