@@ -490,6 +490,23 @@ function columnSuggestions(columns: TableColumn[], range: Range, prefix?: string
     .filter((c) => !prefix || c.label.toLowerCase().startsWith(prefix.toLowerCase()));
 }
 
+// ClickHouse documents its functions in Markdown, with links relative to its own docs site, which
+// lead nowhere from Grafana, so those keep only their text.
+const relativeLink = /\[([^\]]*)\]\((?!https?:\/\/)[^)]*\)/g;
+const markdown = (text: string) => text.replace(relativeLink, '$1').trim();
+
+/** The function's syntax, description, arguments and return value, rendered as Markdown. */
+export function functionDocumentation(f: SqlFunction): monacoTypes.IMarkdownString {
+  const parts = [
+    f.syntax?.trim() && '```sql\n' + f.syntax.trim() + '\n```',
+    f.description?.trim() && markdown(f.description),
+    f.arguments?.trim() && `**Arguments**\n\n${markdown(f.arguments)}`,
+    f.returnedValue?.trim() && `**Returned value**\n\n${markdown(f.returnedValue)}`,
+    f.aliasTo && `Alias of \`${f.aliasTo}\`.`,
+  ].filter((part): part is string => Boolean(part));
+  return { value: parts.length > 0 ? parts.join('\n\n') : 'No description.' };
+}
+
 async function fetchFunctionSuggestions(schema: Schema, range: Range) {
   // ClickHouse's `__`-prefixed built-ins are query planner helpers, not user-facing SQL.
   // `origin` keeps a user-defined function of the same shape, which reports SQLUserDefined.
@@ -501,17 +518,7 @@ async function fetchFunctionSuggestions(schema: Schema, range: Range) {
     kind: monaco.languages.CompletionItemKind.Function,
     sortText: `${c.name}`,
     detail: c.categories || (c.isAggregate && 'Aggregate') || '',
-    documentation: [
-      `Category: ${c.categories || '(none)'}`,
-      `Alias: ${c.aliasTo || '(none)'}`,
-      `Aggregate: ${c.isAggregate}`,
-      `Case insensitive: ${c.caseInsensitive}`,
-      `Origin: ${c.origin}`,
-      `Description: ${c.description || '(none)'}`,
-      `Syntax: ${c.syntax || '(none)'}`,
-      `Arguments: ${c.arguments || '(none)'}`,
-      `Returned value: ${c.returnedValue || '(none)'}`,
-    ].join('\n'),
+    documentation: functionDocumentation(c),
     insertText: `${c.name}(\${1})`,
     insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
     range,

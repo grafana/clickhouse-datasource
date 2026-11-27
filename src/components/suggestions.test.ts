@@ -1,5 +1,5 @@
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
-import { getSuggestions, Schema } from './suggestions';
+import { functionDocumentation, getSuggestions, Schema } from './suggestions';
 import { Range } from './sqlProvider';
 import { pluginMacros } from 'ch-parser/pluginMacros';
 
@@ -9,6 +9,33 @@ jest.mock('@grafana/runtime', () => ({
     replace: (s: string) => s,
   }),
 }));
+
+describe('functionDocumentation', () => {
+  it('renders the syntax, description, arguments and return value as Markdown', () => {
+    const doc = functionDocumentation({
+      name: 'toStartOfInterval',
+      syntax: 'toStartOfInterval(value, INTERVAL x unit[, time_zone])',
+      description: 'Rounds down a time to the start of an interval, see [the guide](https://clickhouse.com/docs/x).',
+      arguments: '- `value` — A [`DateTime`](/reference/data-types/datetime).',
+      returnedValue: 'The start of the interval. [`DateTime`](/reference/data-types/datetime)',
+      aliasTo: '',
+    } as SqlFunction);
+
+    expect(doc.value).toBe(
+      [
+        '```sql\ntoStartOfInterval(value, INTERVAL x unit[, time_zone])\n```',
+        'Rounds down a time to the start of an interval, see [the guide](https://clickhouse.com/docs/x).',
+        '**Arguments**\n\n- `value` — A `DateTime`.',
+        '**Returned value**\n\nThe start of the interval. `DateTime`',
+      ].join('\n\n')
+    );
+  });
+
+  it('names the function an alias stands for, and says when there is nothing to show', () => {
+    expect(functionDocumentation({ name: 'toLower', aliasTo: 'lower' } as SqlFunction).value).toBe('Alias of `lower`.');
+    expect(functionDocumentation({ name: 'myUdf' } as SqlFunction).value).toBe('No description.');
+  });
+});
 
 describe('Suggestions', () => {
   it('matches columns case-insensitively when a prefix is typed', async () => {
