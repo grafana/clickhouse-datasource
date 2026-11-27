@@ -19,6 +19,12 @@ const useUniqueJSONPaths = (
   const [fetched, setFetched] = useState<FetchedPaths>();
   const enabled = Boolean(datasource && jsonColumn && database && table);
   const key = JSON.stringify([jsonColumn, database, table, keysColumn]);
+  const isCurrent = enabled && fetched?.datasource === datasource && fetched.key === key;
+  // Drop a result once the inputs move away from it, so coming back to the same inputs starts
+  // empty and waits for a fresh fetch (and stays empty if that fetch fails), as before.
+  if (fetched && !isCurrent) {
+    setFetched(undefined);
+  }
 
   useEffect(() => {
     if (!enabled) {
@@ -43,7 +49,7 @@ const useUniqueJSONPaths = (
     };
   }, [enabled, key, datasource, jsonColumn, database, table, keysColumn]);
 
-  return enabled && fetched?.datasource === datasource && fetched.key === key ? fetched.paths : EMPTY;
+  return isCurrent ? fetched.paths : EMPTY;
 };
 
 const EMPTY: readonly string[] = [];

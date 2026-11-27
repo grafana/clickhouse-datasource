@@ -272,11 +272,17 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
   const isExplore = app === CoreApp.Explore;
   const [heatmapReplaced, setHeatmapReplaced] = useState(false);
   const heatmapInExplore = isExplore && metric?.fn === MetricFunction.Heatmap;
+  // The notice shows from the render that sees the heatmap; the query itself is converted in the
+  // Effect below, which owns the once-per-pick flag. Picking a metric or function re-arms both.
+  if (heatmapInExplore && !heatmapReplaced) {
+    setHeatmapReplaced(true);
+  }
+  const heatmapConverted = useRef(false);
   useEffect(() => {
-    if (!heatmapInExplore || heatmapReplaced) {
+    if (!heatmapInExplore || heatmapConverted.current) {
       return;
     }
-    setHeatmapReplaced(true);
+    heatmapConverted.current = true;
     apply(
       {
         ...builderOptions,
@@ -289,7 +295,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
       },
       false
     );
-  }, [apply, builderOptions, heatmapInExplore, heatmapReplaced, metric]);
+  }, [apply, builderOptions, heatmapInExplore, metric]);
 
   // Picking a metric runs a few lookups for it. Only the latest pick is applied, on top of any
   // edits made while the lookups ran.
@@ -297,6 +303,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
   const lastPick = useRef(0);
   const onMetricChange = async (value: string) => {
     setHeatmapReplaced(false);
+    heatmapConverted.current = false;
     setPickError(undefined);
     const pick = ++lastPick.current;
     const { type, name } = parseMetricOptionValue(value);
@@ -394,6 +401,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
 
   const onFunctionChange = (fn: MetricFunction) => {
     setHeatmapReplaced(false);
+    heatmapConverted.current = false;
     const quantiles =
       fn === MetricFunction.Quantile
         ? metric.quantiles?.length
