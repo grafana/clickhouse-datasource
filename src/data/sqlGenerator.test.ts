@@ -1190,6 +1190,7 @@ describe('escapeValue', () => {
     { input: `count(column)`, expected: `count(column)` },
     { input: `'custom expression'`, expected: `'custom expression'` },
     { input: `plain text`, expected: `'plain text'` },
+    { input: `C:\\temp\\new`, expected: `'C:\\\\temp\\\\new'` },
     { input: `text`, expected: `'text'` },
     { input: `"column"`, expected: `"column"` },
     { input: `invalid(`, expected: `invalid(` },

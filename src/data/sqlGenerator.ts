@@ -764,7 +764,8 @@ const escapeValue = (value: string | number | boolean): string => {
     return value;
   }
 
-  return `'${value}'`;
+  // ClickHouse reads backslash escapes inside a string literal, so a backslash is doubled to reach the server as typed.
+  return `'${value.replace(/\\/g, '\\\\')}'`;
 };
 
 /**
