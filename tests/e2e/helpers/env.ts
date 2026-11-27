@@ -14,6 +14,8 @@ export const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFA
 
 // Logs-only and traces-only datasources from the local provisioning file.
 export const SINGLE_LOGS_DATASOURCE_UID = 'clickhouse-e2e-single-logs';
+// Logs-only datasource whose table (tests/fixtures/logs_no_columns.sql) has no column that resolves to a logs role.
+export const SINGLE_LOGS_NO_COLUMNS_DATASOURCE_UID = 'clickhouse-e2e-single-logs-no-columns';
 export const SINGLE_TRACES_DATASOURCE_UID = 'clickhouse-e2e-single-traces';
 
 // Every fixture row in tests/fixtures/ sits at 2024-03-15 10:00-10:09 UTC.

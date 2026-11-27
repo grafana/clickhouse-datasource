@@ -10,6 +10,7 @@ import {
   FIXTURE_TO_ISO,
   isCloudRun,
   SINGLE_LOGS_DATASOURCE_UID,
+  SINGLE_LOGS_NO_COLUMNS_DATASOURCE_UID,
   SINGLE_TRACES_DATASOURCE_UID,
 } from '../helpers/env';
 import { exploreUrl } from '../helpers/explore';
@@ -54,6 +55,46 @@ test.describe('Compact query mode', () => {
     await page.keyboard.press('Enter');
     await responsePromise;
     expect(frames(getBody()).length).toBeGreaterThan(0);
+  });
+
+  test('explains why a logs table with no matching columns has no query', async ({ page }) => {
+    await page.goto(
+      exploreUrl({
+        datasourceUid: SINGLE_LOGS_NO_COLUMNS_DATASOURCE_UID,
+        from: FIXTURE_FROM_ISO,
+        to: FIXTURE_TO_ISO,
+      })
+    );
+
+    await page.getByRole('button', { name: 'Switch to compact view' }).click();
+
+    const queryEditor = page.locator('[data-testid="query-editor-section-builder"]');
+    await expect(queryEditor.locator('[data-testid="compact-filter-bar"]')).toBeVisible();
+
+    // The notice appears after a short delay, once default columns have had time to apply.
+    const notice = page.getByTestId('logs-no-columns-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('logs_no_columns');
+    await expect(notice.getByRole('link')).toHaveAttribute(
+      'href',
+      `/connections/datasources/edit/${SINGLE_LOGS_NO_COLUMNS_DATASOURCE_UID}#logs-config`
+    );
+  });
+
+  test('shows no no-columns notice when the logs table has matching columns', async ({ page }) => {
+    await page.goto(
+      exploreUrl({
+        datasourceUid: SINGLE_LOGS_DATASOURCE_UID,
+        from: FIXTURE_FROM_ISO,
+        to: FIXTURE_TO_ISO,
+      })
+    );
+
+    await page.getByRole('button', { name: 'Switch to compact view' }).click();
+    await expect(page.getByPlaceholder('Search log body text...')).toBeVisible();
+    // Wait past the notice delay (400ms) so a late notice cannot slip through.
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId('logs-no-columns-notice')).toHaveCount(0);
   });
 
   test('renders compact traces editor for single-source datasource', async ({ page }) => {

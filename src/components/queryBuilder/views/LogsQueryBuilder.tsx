@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
+import { NoLogColumnsNotice, hasNoLogColumns } from '../NoLogColumnsNotice';
 import { ColumnRolesHelp } from '../ColumnRolesHelp';
 import { ColumnSelect } from '../ColumnSelect';
 import { OtelVersionSelect } from '../OtelVersionSelect';
@@ -158,6 +159,9 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   return (
     <div>
       {configWarning}
+      {hasNoLogColumns(builderOptions, allColumns) && (
+        <NoLogColumnsNotice datasourceUid={datasource.uid} table={builderOptions.table} />
+      )}
       <OtelVersionSelect
         enabled={builderState.otelEnabled}
         onEnabledChange={(e) => builderOptionsDispatch(setOtelEnabled(e))}

@@ -13,6 +13,7 @@ import { CoreApp, TimeRange } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
 import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
 import { TableQueryBuilder } from './views/TableQueryBuilder';
+import { NoLogColumnsNotice, hasNoLogColumns } from './NoLogColumnsNotice';
 import { SqlPreview } from './SqlPreview';
 import { DatabaseTableSelect } from 'components/queryBuilder/DatabaseTableSelect';
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
@@ -440,6 +441,9 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
 
   return (
     <div data-testid="query-editor-section-builder">
+      {hasNoLogColumns(activeOptions, allColumns) && (
+        <NoLogColumnsNotice datasourceUid={datasource.uid} table={activeOptions.table} />
+      )}
       <CompactModeBar
         mode={getDefaultCompactMode(signalType)}
         searchText={activeOptions.meta?.logMessageLike || ''}

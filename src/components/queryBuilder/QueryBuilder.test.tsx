@@ -17,6 +17,7 @@ import { setColumnByHint, setTable, useBuilderOptionsState } from 'hooks/useBuil
 import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
 import { selectors } from 'selectors';
+import { NO_LOG_COLUMNS_NOTICE_DELAY_MS } from './NoLogColumnsNotice';
 
 jest.mock('./views/TableQueryBuilder', () => ({
   TableQueryBuilder: () => <div data-testid="table-component" />,
@@ -488,6 +489,62 @@ describe('QueryBuilder', () => {
     expect(options.columns || []).toHaveLength(0);
     // ...and the generated logs query is empty rather than `SELECT  FROM "logs"."host_logs"`.
     expect(generateSql(options)).toBe('');
+  });
+
+  it('shows a notice when no role column resolves for a non-OTel compact logs table', async () => {
+    const buildDs = (columns: Array<{ name: string; type: string; picklistValues: never[] }>) =>
+      ({
+        ...mockDs,
+        uid: 'no-roles',
+        getSignalType: jest.fn(() => 'logs'),
+        getConfigMode: jest.fn(() => 'single-table'),
+        isSingleTableMode: jest.fn(() => true),
+        getDefaultLogsDatabase: jest.fn(() => 'logs'),
+        getDefaultLogsTable: jest.fn(() => 'host_logs'),
+        getDefaultLogsColumns: jest.fn(() => new Map()),
+        getLogsOtelVersion: jest.fn(() => undefined),
+        shouldSelectLogContextColumns: jest.fn(() => false),
+        getLogContextColumnNames: jest.fn(() => []),
+        getAdditionalLogColumns: jest.fn(() => []),
+        fetchColumns: jest.fn(() => Promise.resolve(columns)),
+      }) as unknown as Datasource;
+
+    renderCompactWithRealReducer(
+      buildDs([
+        { name: 'remote_addr', type: 'String', picklistValues: [] },
+        { name: 'status', type: 'UInt16', picklistValues: [] },
+      ])
+    );
+    expect(await screen.findByTestId('logs-no-columns-notice')).toBeInTheDocument();
+  });
+
+  it('shows no notice for a non-OTel compact logs table whose roles resolve by name', async () => {
+    const datasource = {
+      ...mockDs,
+      uid: 'roles',
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'logs'),
+      getDefaultLogsTable: jest.fn(() => 'host_logs'),
+      getDefaultLogsColumns: jest.fn(() => new Map()),
+      getLogsOtelVersion: jest.fn(() => undefined),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() =>
+        Promise.resolve([
+          { name: 'timestamp', type: 'DateTime', picklistValues: [] },
+          { name: 'message', type: 'String', picklistValues: [] },
+        ])
+      ),
+    } as unknown as Datasource;
+    renderCompactWithRealReducer(datasource);
+    await waitFor(() => expect(datasource.fetchColumns).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId('compact-mode-bar')).toBeInTheDocument());
+    // Wait past the notice delay so a notice that wrongly appears would be caught.
+    await new Promise((r) => setTimeout(r, NO_LOG_COLUMNS_NOTICE_DELAY_MS + 100));
+    expect(screen.queryByTestId('logs-no-columns-notice')).not.toBeInTheDocument();
   });
 
   it('preserves an authored query when its type does not match the datasource signal', async () => {
