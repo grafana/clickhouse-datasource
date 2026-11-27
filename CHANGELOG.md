@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.25.0](https://github.com/grafana/clickhouse-datasource/compare/v4.24.0...v4.25.0) (2026-11-27)
+
+
+### 🎉 Features
+
+* **metrics:** add OTel metrics as a single-source signal ([#2282](https://github.com/grafana/clickhouse-datasource/issues/2282)) ([156d839](https://github.com/grafana/clickhouse-datasource/commit/156d839bddd499586eefdf34dcdc8efc13ceb869))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** keep dotted column names whole when table names are hidden ([#2341](https://github.com/grafana/clickhouse-datasource/issues/2341)) ([5f61dee](https://github.com/grafana/clickhouse-datasource/commit/5f61dee006cac5e3b13ca70c2a47ba554b3b390e))
+* **adhoc:** resolve chained CTEs to their table in ad-hoc filters ([#2321](https://github.com/grafana/clickhouse-datasource/issues/2321)) ([6ca8106](https://github.com/grafana/clickhouse-datasource/commit/6ca81068cf603250485898860fee187865b66f62))
+* **autocomplete:** insert a variable without repeating the typed $ ([#2326](https://github.com/grafana/clickhouse-datasource/issues/2326)) ([e463510](https://github.com/grafana/clickhouse-datasource/commit/e46351062cd0b6c74a7da9469905ee7524918d2e))
+* **autocomplete:** start a new line on Enter after a space ([#2325](https://github.com/grafana/clickhouse-datasource/issues/2325)) ([ee97ecb](https://github.com/grafana/clickhouse-datasource/commit/ee97ecbd8819f9c01bfa48fd15e2e502be3f2122))
+* **autocomplete:** stop repeating suggestions when several SQL editors are open ([#2318](https://github.com/grafana/clickhouse-datasource/issues/2318)) ([b25ebbd](https://github.com/grafana/clickhouse-datasource/commit/b25ebbd671d875acff3aebb40175710a378d439e))
+* **autocomplete:** suggest columns inside and on top of CTEs ([#2320](https://github.com/grafana/clickhouse-datasource/issues/2320)) ([9d8dbe1](https://github.com/grafana/clickhouse-datasource/commit/9d8dbe12555d640b2dbd0b4191e4dfe225e8e637))
+* **autocomplete:** suggest functions on ClickHouse older than 23.8 ([#2333](https://github.com/grafana/clickhouse-datasource/issues/2333)) ([957a70b](https://github.com/grafana/clickhouse-datasource/commit/957a70b0049f942cf3a117a443a065c69a187d3d))
+* **explore:** share the set-operation rule between log volume and ad-hoc filters ([#2314](https://github.com/grafana/clickhouse-datasource/issues/2314)) ([7f37839](https://github.com/grafana/clickhouse-datasource/commit/7f37839bccbf587349cb70c0d506a1598ba0b881))
+* **format:** format queries with a bare interval such as 5m ([#2380](https://github.com/grafana/clickhouse-datasource/issues/2380)) ([f0d8003](https://github.com/grafana/clickhouse-datasource/commit/f0d8003a83bad576383ba060733bbcd4f288b139))
+* **format:** keep Grafana macros and variables intact when formatting SQL ([#2317](https://github.com/grafana/clickhouse-datasource/issues/2317)) ([ae01d8a](https://github.com/grafana/clickhouse-datasource/commit/ae01d8aa43309f5f74b261eb7f711a456ac7df7d))
+* **health:** check the table of a Single source data source on Save & test ([#2356](https://github.com/grafana/clickhouse-datasource/issues/2356)) ([758f7c0](https://github.com/grafana/clickhouse-datasource/commit/758f7c099640cca2d9cce1f9772c4ff09bae78c3))
+* **logs:** show plain columns in SQL log details next to attribute maps ([#2329](https://github.com/grafana/clickhouse-datasource/issues/2329)) ([d4ac0f7](https://github.com/grafana/clickhouse-datasource/commit/d4ac0f743deb304b7543da50db19c5fdab693577))
+* **macros:** accept day and week intervals in $__timeGroup ([#2336](https://github.com/grafana/clickhouse-datasource/issues/2336)) ([60de7bb](https://github.com/grafana/clickhouse-datasource/commit/60de7bb67d62ec677eb31133443b386230716319))
+* **validation:** treat the Unicode spaces ClickHouse skips as whitespace ([#2313](https://github.com/grafana/clickhouse-datasource/issues/2313)) ([ea55df8](https://github.com/grafana/clickhouse-datasource/commit/ea55df8ea6e456924177ec5f64ac8ddd2ac1b64d))
+
+
+### ♻️ Code Refactoring
+
+* fix React Compiler lint findings and restore them as errors ([#2385](https://github.com/grafana/clickhouse-datasource/issues/2385)) ([f4e77de](https://github.com/grafana/clickhouse-datasource/commit/f4e77defa72de8849ad8b9d60d6045c61d4fa77f))
+
 ## [4.24.0](https://github.com/grafana/clickhouse-datasource/compare/v4.23.5...v4.24.0) (2026-11-24)
 
 
