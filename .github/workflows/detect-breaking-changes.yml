@@ -1,9 +1,12 @@
 name: Compatibility check
 on:
   pull_request:
+  merge_group:
 
 jobs:
   compatibilitycheck:
+    # A skipped job satisfies the required check in merge groups.
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write # needed for the `comment-pr: yes` step below

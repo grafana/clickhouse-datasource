@@ -151,9 +151,19 @@ Give the pull request a [Conventional Commits](https://www.conventionalcommits.o
 The commit type sets the version bump:
 
 - `feat` bumps the minor version.
-- A breaking change, marked with `!` after the type or with a `BREAKING CHANGE:` footer, bumps the major version.
+- A breaking change bumps the major version. Mark it with `!` before the colon in the pull request title, for example `feat(logs)!: remove the legacy log format`.
 - Every other type except `chore` bumps the patch version. `chore` commits don't appear in the changelog and don't start a release.
 
-Routine dependency updates use `chore(deps)`, so they don't start a release. Security updates use `fix(deps)`, so they start a release. To release a routine update on its own, add a `Release-As: X.Y.Z` footer to the commit message.
+Routine dependency updates use `chore(deps)`, so they don't start a release. Security updates use `fix(deps)`, so they start a release.
+
+The squash commit on `main` has only the pull request title, so footers in branch commits don't reach release-please. To set the release version, add a `BEGIN_COMMIT_OVERRIDE` block to the pull request description. For example, use it to release a routine update on its own. release-please uses the block in place of the commit message, so start the block with the title:
+
+```text
+BEGIN_COMMIT_OVERRIDE
+chore(deps): update dependency foo to v2 (#1234)
+
+Release-As: 4.25.0
+END_COMMIT_OVERRIDE
+```
 
 To publish outside this flow, for example an emergency fix for on-premises users or a docs-only update, run the **Plugins - Publish plugin** workflow (`.github/workflows/publish.yml`) manually.

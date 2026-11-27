@@ -15,14 +15,15 @@ on:
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  merge_group:
 
 permissions: {}
 
 jobs:
   canary:
     name: Compare collector schema against snapshot
-    # PRs only run the canary when explicitly opted in with the schema-canary label
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'schema-canary')
+    # PRs run the canary only with the schema-canary label. Merge groups skip it.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'schema-canary')
     runs-on: ubuntu-latest
     permissions:
       contents: read
