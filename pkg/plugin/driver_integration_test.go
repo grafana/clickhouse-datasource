@@ -1635,3 +1635,72 @@ func TestQueryDataRowLimit(t *testing.T) {
 	assert.True(t, truncated, "the response must carry a truncation notice")
 }
 
+// TestCheckHealthSingleSourceTable runs Save & test's health check for Single source data sources
+// whose table or database doesn't exist, over both protocols. cspell:ignore onee systemm
+func TestCheckHealthSingleSourceTable(t *testing.T) {
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	ctx := backend.WithGrafanaConfig(context.Background(), backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+
+	protocols := []struct{ name, port string }{
+		{name: "native", port: getEnv("CLICKHOUSE_PORT", "9000")},
+		{name: "http", port: getEnv("CLICKHOUSE_HTTP_PORT", "8123")},
+	}
+	tests := []struct {
+		name     string
+		source   string
+		wantText string // empty when the check passes
+	}{
+		{
+			name:   "an existing logs table passes",
+			source: `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": "system", "defaultTable": "one" }`,
+		},
+		{
+			name:     "a missing logs table fails",
+			source:   `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": "system", "defaultTable": "onee" }`,
+			wantText: "[table] Table system.onee does not exist",
+		},
+		{
+			name:     "a missing traces database fails",
+			source:   `"configMode": "single-table", "signalType": "traces", "traces": { "defaultDatabase": "systemm", "defaultTable": "one" }`,
+			wantText: "[table] Database systemm does not exist",
+		},
+		{
+			name:   "all databases mode passes with a missing default table",
+			source: `"configMode": "classic", "signalType": "logs", "logs": { "defaultDatabase": "system", "defaultTable": "onee" }`,
+		},
+	}
+	for _, protocol := range protocols {
+		for _, tt := range tests {
+			t.Run(protocol.name+"/"+tt.name, func(t *testing.T) {
+				settings := backend.DataSourceInstanceSettings{
+					JSONData: []byte(fmt.Sprintf(`{ "host": "%s", "port": %s, "protocol": "%s", "username": "%s", "secure": %s, %s }`,
+						host, protocol.port, protocol.name, username, ssl, tt.source)),
+					DecryptedSecureJSONData: map[string]string{"password": password},
+				}
+				dsInstance, err := NewDatasource(ctx, settings)
+				require.NoError(t, err)
+				ds, ok := dsInstance.(backend.CheckHealthHandler)
+				require.True(t, ok, "instance must implement backend.CheckHealthHandler")
+
+				res, err := ds.CheckHealth(ctx, &backend.CheckHealthRequest{
+					PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+				})
+				require.NoError(t, err)
+				if tt.wantText == "" {
+					assert.Equal(t, backend.HealthStatusOk, res.Status, res.Message)
+					return
+				}
+				assert.Equal(t, backend.HealthStatusError, res.Status)
+				assert.Contains(t, res.Message, tt.wantText)
+			})
+		}
+	}
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
+	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
 )
 
@@ -33,6 +34,19 @@ func newSQLDatasource(ctx context.Context, settings backend.DataSourceInstanceSe
 		// sqlds opens one pool per forwarded header set, and the rotating identity token keeps adding new sets.
 		ds.ConnectionCacheFactory = func() sqlds.ConnectionCache {
 			return sqlds.NewIdleEvictingCache(connectionIdleTTL)
+		}
+	}
+	// The connection check alone passes for a Single source data source whose table doesn't
+	// exist, so the health check also looks the table up. Invalid settings are left to Connect,
+	// which reports them.
+	if chSettings, err := LoadSettings(ctx, settings); err == nil && chSettings.SingleSourceTable != nil {
+		source := chSettings.SingleSourceTable
+		ds.PostCheckHealth = func(ctx context.Context, _ *backend.CheckHealthRequest) *backend.CheckHealthResult {
+			db, err := ds.GetDBFromQuery(ctx, &sqlutil.Query{})
+			if err != nil {
+				return nil
+			}
+			return checkSingleSourceTable(ctx, db, source)
 		}
 	}
 

@@ -31,6 +31,7 @@ The plugin classifies connection and configuration errors into categories and pr
 | `[timeout]` | The connection or query exceeded the configured timeout.                                     |
 | `[config]`  | A data source setting is missing or invalid (empty host, bad port, invalid JSON).            |
 | `[server]`  | ClickHouse returned a server-side error (`DB::Exception`, HTTP 5xx).                         |
+| `[table]`   | The database or table that a Single source data source reads doesn't exist, found by **Save & test** (`UNKNOWN_DATABASE`, `UNKNOWN_TABLE`). |
 | `[unknown]` | The error does not match a known pattern.                                                    |
 
 For authentication errors, the plugin appends an additional hint after the error message:

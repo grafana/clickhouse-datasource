@@ -23,6 +23,9 @@ const (
 	ConnectionErrorCategoryConfig  ConnectionErrorCategory = "config"
 	ConnectionErrorCategoryServer  ConnectionErrorCategory = "server"
 	ConnectionErrorCategoryUnknown ConnectionErrorCategory = "unknown"
+	// ConnectionErrorCategoryTable is a working connection to a database or table that doesn't
+	// exist, reported by the health check of a Single source data source.
+	ConnectionErrorCategoryTable ConnectionErrorCategory = "table"
 )
 
 // configValidationErrors maps sentinel errors from errors.go to their category.

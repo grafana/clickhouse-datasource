@@ -90,6 +90,19 @@ type Settings struct {
 	// jsonData.logs.attributeColumnExclusions. Empty by default, so nothing is
 	// dropped unless a path is listed.
 	LogsAttributeColumnExclusions []string `json:"-"`
+
+	// SingleSourceTable is the table a Single source logs or traces data source reads, resolved
+	// the way the query builder resolves it, so the health check can confirm that it exists. Nil
+	// in All databases mode and when no table is set. Parsed from jsonData.configMode,
+	// jsonData.signalType, jsonData.defaultDatabase, jsonData.defaultTable and the logs or traces
+	// defaults.
+	SingleSourceTable *SourceTable `json:"-"`
+}
+
+// SourceTable is a database and table the data source is configured to read.
+type SourceTable struct {
+	Database string
+	Table    string
 }
 
 type CustomSetting struct {
@@ -336,7 +349,58 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
+	if settings.SingleSourceTable, err = singleSourceTable(jsonData, settings.DefaultDatabase); err != nil {
+		return settings, err
+	}
+
 	return settings, settings.isValid()
+}
+
+// singleSourceTable resolves the table of a Single source data source as the frontend does
+// (getConfigMode and getSingleTableLocation): the signal's default database and table, falling
+// back to the data source's default database and table, and to the database "default". It
+// returns nil in All databases mode, for a signal type other than logs and traces, and when no
+// table is set, and an error when one of these settings is not a string.
+func singleSourceTable(jsonData map[string]interface{}, defaultDatabase string) (*SourceTable, error) {
+	configMode, err := stringSetting(jsonData, "configMode")
+	if err != nil {
+		return nil, err
+	}
+	signal, err := stringSetting(jsonData, "signalType")
+	if err != nil {
+		return nil, err
+	}
+	if configMode == "" && signal != "" {
+		configMode = "single-table"
+	}
+	if configMode != "single-table" || (signal != "logs" && signal != "traces") {
+		return nil, nil
+	}
+
+	section, _ := jsonData[signal].(map[string]interface{})
+	database, err := stringSetting(section, "defaultDatabase")
+	if err != nil {
+		return nil, fmt.Errorf("%s settings: %w", signal, err)
+	}
+	table, err := stringSetting(section, "defaultTable")
+	if err != nil {
+		return nil, fmt.Errorf("%s settings: %w", signal, err)
+	}
+	if database == "" {
+		database = defaultDatabase
+	}
+	if database == "" {
+		database = "default"
+	}
+	if table == "" {
+		if table, err = stringSetting(jsonData, "defaultTable"); err != nil {
+			return nil, err
+		}
+	}
+	if table == "" {
+		return nil, nil
+	}
+	return &SourceTable{Database: database, Table: table}, nil
 }
 
 // loadHttpHeaders loads secure and plain text headers from the config

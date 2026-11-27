@@ -3032,6 +3032,7 @@ const CONNECTION_ERROR_HINTS: Record<string, string> = {
   timeout:
     'Check that the ClickHouse server is reachable and consider increasing the dial timeout in the connection settings.',
   config: 'Check that all required fields are correctly filled in.',
+  table: 'Check the database and table names in the logs or traces settings of this data source.',
 };
 
 function getConnectionErrorHint(category: string, detail: string): string | undefined {

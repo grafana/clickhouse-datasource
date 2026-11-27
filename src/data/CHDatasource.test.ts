@@ -5120,5 +5120,20 @@ describe('ClickHouseDatasource', () => {
         error: expect.any(HealthCheckError),
       });
     });
+
+    it('points to the logs or traces settings when the configured table does not exist', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
+        status: HealthStatus.Error,
+        message: '[table] Table otel.otel_logz does not exist. Maybe you meant otel.otel_logs?',
+        details: {},
+      });
+
+      await expect(ds.testDatasource()).rejects.toMatchObject({
+        status: 'error',
+        message:
+          'Table error [Table otel.otel_logz does not exist. Maybe you meant otel.otel_logs?]: Check the database and table names in the logs or traces settings of this data source.',
+      });
+    });
   });
 });
