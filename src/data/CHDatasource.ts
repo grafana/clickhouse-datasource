@@ -285,6 +285,25 @@ function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
   return isStringType(f.type) && sameColumn;
 }
 
+/**
+ * Returns the index of the closing quote of the quoted string or identifier that opens at `start`, or the last
+ * index of the text when it is not closed. A backslash or a doubled quote escapes the quote character.
+ */
+const skipQuoted = (text: string, start: number): number => {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] === '\\') {
+      i++;
+    } else if (text[i] === quote) {
+      if (text[i + 1] !== quote) {
+        return i;
+      }
+      i++;
+    }
+  }
+  return text.length - 1;
+};
+
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
   implements
@@ -1063,24 +1082,27 @@ export class Datasource
 
   private getMacroArgs(query: string, argsIndex: number): string[] {
     const args = [] as string[];
-    const re = /\(|\)|,/g;
     let bracketCount = 0;
     let lastArgEndIndex = 1;
-    let regExpArray: RegExpExecArray | null;
     const argsSubstr = query.substring(argsIndex, query.length);
-    while ((regExpArray = re.exec(argsSubstr)) !== null) {
-      const foundNode = regExpArray[0];
-      if (foundNode === '(') {
+    for (let i = 0; i < argsSubstr.length; i++) {
+      const char = argsSubstr[i];
+      if (char === "'" || char === '"' || char === '`') {
+        // Brackets and commas inside a quoted string or identifier do not delimit arguments.
+        i = skipQuoted(argsSubstr, i);
+        continue;
+      }
+      if (char === '(') {
         bracketCount++;
-      } else if (foundNode === ')') {
+      } else if (char === ')') {
         bracketCount--;
       }
-      if (foundNode === ',' && bracketCount === 1) {
-        args.push(argsSubstr.substring(lastArgEndIndex, re.lastIndex - 1));
-        lastArgEndIndex = re.lastIndex;
+      if (char === ',' && bracketCount === 1) {
+        args.push(argsSubstr.substring(lastArgEndIndex, i));
+        lastArgEndIndex = i + 1;
       }
       if (bracketCount === 0) {
-        args.push(argsSubstr.substring(lastArgEndIndex, re.lastIndex - 1));
+        args.push(argsSubstr.substring(lastArgEndIndex, i));
         return args;
       }
     }
