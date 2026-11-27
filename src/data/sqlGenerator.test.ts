@@ -422,6 +422,38 @@ describe('SQL Generator', () => {
     );
   });
 
+  it.each([
+    ['p95 latency', 'p95_latency'],
+    ['p95-latency', '"p95-latency"'],
+    ['95th', '"95th"'],
+    ['avg(x)', '"avg(x)"'],
+    ['say "hi"', '"say_""hi"""'],
+  ])('renders the aggregate alias %j as %s', (alias, expected) => {
+    const aggregates = [{ aggregateType: AggregateType.Max, column: 'x', alias }];
+    const trend: QueryBuilderOptions = {
+      database: 'default',
+      table: 't',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      columns: [{ name: 'ts', type: 'DateTime', hint: ColumnHint.Time }],
+      aggregates,
+    };
+    expect(generateSql(trend)).toContain(`max(x) as ${expected}`);
+
+    const simple: QueryBuilderOptions = { ...trend, mode: BuilderMode.List };
+    expect(generateSql(simple)).toContain(`max(x) as ${expected}`);
+
+    const table: QueryBuilderOptions = {
+      database: 'default',
+      table: 't',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [],
+      aggregates,
+    };
+    expect(generateSql(table)).toEqual(`SELECT max(x) as ${expected} FROM "default"."t"`);
+  });
+
   it('generates trace ID query without OTel enabled', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
