@@ -23,6 +23,7 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
@@ -1540,6 +1541,77 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('metrics metadata lookups', () => {
+    const tablesFrame = arrayToDataFrame([
+      { name: 'otel_metrics_gauge' },
+      { name: 'otel_metrics_sum' },
+      { name: 'otel_metrics_histogram' },
+      { name: 'otel_metrics_exp_histogram' },
+      { name: 'otel_metrics_summary' },
+    ]);
+    const catalogFrame = arrayToDataFrame([{ name: 'cpu', type: 'gauge', unit: '1', description: '', monotonic: 0 }]);
+
+    const instance = () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      return { ds, spy };
+    };
+
+    // A new alert rule has no dashboard time range, and without one the lookups read from 1970.
+    it('falls back to the last 6 hours when the page has no time range', async () => {
+      const { ds, spy } = instance();
+      delete (templateSrvMock as any).timeRange;
+
+      await ds.fetchMetricCatalog();
+
+      const range = spy.mock.calls[1][0].range as TimeRange;
+      expect(range.from).toBeDefined();
+      expect(range.to.valueOf() - range.from.valueOf()).toBe(6 * 60 * 60 * 1000);
+      expect(range.to.valueOf()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('uses the page time range when there is one', async () => {
+      const { ds, spy } = instance();
+      const range = { from: dateTime(1735689600000), to: dateTime(1735693200000) };
+      (templateSrvMock as any).timeRange = range;
+
+      try {
+        await ds.fetchMetricCatalog();
+      } finally {
+        delete (templateSrvMock as any).timeRange;
+      }
+
+      expect(spy.mock.calls[1][0].range).toBe(range);
+    });
+
+    it('does not cache a database without metric tables', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      const tableQueries = () =>
+        spy.mock.calls.filter((call) => String(call[0].targets[0].rawSql).startsWith('SHOW TABLES')).length;
+
+      expect(await ds.resolveMetricTables()).toEqual({});
+      expect(await ds.resolveMetricTables()).toEqual({});
+      // A page opened before the exporter creates its tables retries instead of staying empty.
+      expect(tableQueries()).toBe(2);
+
+      spy.mockImplementation((request) =>
+        of({
+          data: [String(request.targets[0].rawSql).startsWith('SHOW TABLES') ? tablesFrame : catalogFrame],
+        })
+      );
+      const tables = await ds.resolveMetricTables();
+      expect(tables[MetricType.Gauge]).toBe('otel_metrics_gauge');
+      expect(tables[MetricType.Summary]).toBe('otel_metrics_summary');
+      await ds.resolveMetricTables();
+      expect(tableQueries()).toBe(3);
+    });
+  });
+
   describe('distinct value suggestions', () => {
     it('escapes identifiers for distinct column values', async () => {
       const ds = cloneDeep(mockDatasource);
@@ -1890,6 +1962,121 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchSqlFunctions', () => {
+    const countIf = {
+      name: 'countIf',
+      is_aggregate: 1,
+      case_insensitive: 0,
+      alias_to: '',
+      origin: 'System',
+      description: 'Counts the rows that match.',
+      syntax: 'countIf(cond)',
+      arguments: '- `cond`: The condition.',
+      returned_value: 'The number of rows.',
+      examples: 'SELECT countIf(x > 1)',
+      categories: 'Aggregate Functions',
+    };
+
+    it('selects only the columns of system.functions that the server has', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([countIf]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchSqlFunctions();
+
+      const sql = spyOnQuery.mock.calls[0][0].targets[0].rawSql.replace(/\s+/g, ' ').trim();
+      expect(sql).toBe(
+        "SELECT COLUMNS('^(name|is_aggregate|case_insensitive|alias_to|origin|description|syntax|arguments|returned_value|examples|categories)$') FROM system.functions LIMIT 10000"
+      );
+    });
+
+    it('reads every column by its name', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const { categories, ...rest } = countIf;
+      // The same columns in another order than the query names them.
+      const frame = arrayToDataFrame([{ categories, ...rest }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'countIf',
+          isAggregate: true,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Counts the rows that match.',
+          syntax: 'countIf(cond)',
+          arguments: '- `cond`: The condition.',
+          returnedValue: 'The number of rows.',
+          examples: 'SELECT countIf(x > 1)',
+          categories: 'Aggregate Functions',
+        },
+      ]);
+    });
+
+    it('leaves the documentation empty on a server without its columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 23.3.
+      const frame = arrayToDataFrame([
+        { name: 'plus', is_aggregate: 0, case_insensitive: 0, alias_to: '', origin: 'System', description: 'Adds.' },
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'plus',
+          isAggregate: false,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Adds.',
+          syntax: '',
+          arguments: '',
+          returnedValue: '',
+          examples: '',
+          categories: '',
+        },
+      ]);
+    });
+
+    it('takes every function for a system function on a server without the origin column', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 21.8.
+      const frame = arrayToDataFrame([{ name: '__getScalar', is_aggregate: 0, case_insensitive: 0, alias_to: '' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const [fn] = await ds.fetchSqlFunctions();
+
+      expect(fn.origin).toBe('System');
+      expect(fn.description).toBe('');
+    });
+
+    it('returns no functions when the query fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([]);
+    });
+  });
+
+  describe('getMetricTableFeatures', () => {
+    it('reports a failed DESC TABLE instead of guessing the attribute layout, and reads again next time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchColumns = jest.spyOn(ds, 'fetchColumns').mockResolvedValueOnce([]);
+
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).rejects.toThrow('otel_metrics_gauge');
+
+      // The empty list was not kept, so asking again reads the schema instead of the failure.
+      fetchColumns.mockResolvedValueOnce([
+        { name: 'Attributes', type: 'JSON', label: 'Attributes', picklistValues: [] },
+      ]);
+      await expect(ds.getMetricTableFeatures('db_name', 'otel_metrics_gauge')).resolves.toEqual({
+        jsonAttributes: true,
+      });
+      expect(fetchColumns).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('fetchJSONPathColumns', () => {
     const schema: TableColumn[] = [
       { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },
@@ -2215,6 +2402,99 @@ describe('ClickHouseDatasource', () => {
       // string in the same shape it arrived in.
       const labels = frame.fields.find((f) => f.name === 'labels')!.values[0];
       expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
+    });
+
+    // On Grafana 12.4 and later, log details drop plain fields when every label of a row is in a named
+    // group. A SQL logs query that selects the OTel attribute maps gets only grouped labels, so query()
+    // folds its plain columns into `labels` (foldSqlLogFieldsIntoLabels) to keep them in log details.
+    it('folds the plain columns of a SQL logs query with OTel attribute maps into labels', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql:
+          "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, ResourceAttributes['k8s.pod.name'] AS pod, LogAttributes, ResourceAttributes FROM otel.otel_logs",
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+          { name: 'pod', type: FieldType.string, config: {}, values: ['cart-7d9f'] } as Field,
+          {
+            name: 'labels',
+            type: FieldType.other,
+            config: {},
+            values: [{ 'ResourceAttributes.k8s.pod.name': 'cart-7d9f', 'LogAttributes.event.name': 'proxy.access' }],
+          } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      const frame = response.data[0] as DataFrame;
+      expect(frame.fields.map((f) => f.name)).toEqual(['timestamp', 'body', 'level', 'labels']);
+      expect(frame.fields.find((f) => f.name === 'labels')!.values[0]).toEqual({
+        'ResourceAttributes.k8s.pod.name': 'cart-7d9f',
+        'LogAttributes.event.name': 'proxy.access',
+        ServiceName: 'cart',
+        pod: 'cart-7d9f',
+      });
+    });
+
+    it('leaves a SQL logs query without OTel attribute maps as is', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const sqlQuery: CHSqlQuery = {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        format: 2,
+        rawSql: 'SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName FROM otel.otel_logs',
+      };
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        meta: { preferredVisualisationType: 'logs' },
+        fields: [
+          { name: 'timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'body', type: FieldType.string, config: {}, values: ['GET /cart'] } as Field,
+          { name: 'level', type: FieldType.string, config: {}, values: ['info'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [sqlQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      expect((response.data[0] as DataFrame).fields.map((f) => f.name)).toEqual([
+        'timestamp',
+        'body',
+        'level',
+        'ServiceName',
+      ]);
     });
   });
 

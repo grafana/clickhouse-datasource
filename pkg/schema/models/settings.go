@@ -42,6 +42,9 @@ type ClickHouseSettingsJSON struct {
 
 	Logs   LogsConfig   `json:"logs"`
 	Traces TracesConfig `json:"traces"`
+	// Metrics is omitted when unset, unlike Logs and Traces, so data sources saved before
+	// metrics support keep an identical settings payload.
+	Metrics *MetricsConfig `json:"metrics,omitempty"`
 
 	AliasTables []AliasTableEntry `json:"aliasTables,omitempty"`
 
@@ -109,6 +112,18 @@ type TracesConfig struct {
 	ShowTraceLinks          bool   `json:"showTraceLinks,omitempty"`
 
 	TraceTimestampTableSuffix string `json:"traceTimestampTableSuffix,omitempty"`
+}
+
+// MetricsConfig backs the jsonData.metrics nested object. The table names mirror the
+// opentelemetry-collector-contrib ClickHouse exporter's metrics_tables option.
+type MetricsConfig struct {
+	DefaultDatabase string `json:"defaultDatabase,omitempty"`
+
+	GaugeTable                string `json:"gaugeTable,omitempty"`
+	SumTable                  string `json:"sumTable,omitempty"`
+	HistogramTable            string `json:"histogramTable,omitempty"`
+	ExponentialHistogramTable string `json:"exponentialHistogramTable,omitempty"`
+	SummaryTable              string `json:"summaryTable,omitempty"`
 }
 
 // HTTPHeader backs an entry in the jsonData.httpHeaders array.

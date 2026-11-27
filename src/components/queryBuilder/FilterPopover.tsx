@@ -119,12 +119,18 @@ export const FilterPopover = (props: FilterPopoverProps) => {
   const [value, setValue] = useState(filterValue !== undefined ? String(filterValue) : '');
   const [mapKeys, setMapKeys] = useState<string[]>([]);
 
-  useEffect(() => {
+  // Re-seed the form when the popover is pointed at a different filter. Done during render, not in
+  // an Effect, so the form never renders a frame with the previous filter's values.
+  const [prevFilter, setPrevFilter] = useState(filter);
+  const [prevHintedColumn, setPrevHintedColumn] = useState(hintedColumn);
+  if (filter !== prevFilter || hintedColumn !== prevHintedColumn) {
+    setPrevFilter(filter);
+    setPrevHintedColumn(hintedColumn);
     setSelectedColumn(filter?.key || hintedColumn || '');
     setSelectedMapKey(filterMapKey || '');
     setOperator(filter?.operator || FilterOperator.Equals);
     setValue(filterValue !== undefined ? String(filterValue) : '');
-  }, [filter, filter?.key, filter?.operator, filterMapKey, filterValue, hintedColumn]);
+  }
 
   const selectedColDef = allColumns.find((column) => column.name === selectedColumn);
   const isMapColumn = selectedColDef?.type?.startsWith('Map(') || false;
@@ -136,17 +142,28 @@ export const FilterPopover = (props: FilterPopoverProps) => {
   const filterKind = getFilterValueKind(selectedColDef?.type);
   const currentOperatorOptions = useMemo(() => getOperatorOptions(filterKind), [filterKind]);
 
-  useEffect(() => {
-    if ((isMapColumn || isJSONColumn) && selectedColumn && database && table) {
-      const fetchKeys = isMapColumn
-        ? datasource.fetchUniqueMapKeys(selectedColumn, database, table)
-        : datasource.fetchUniqueJSONPaths(selectedColumn, database, table, jsonKeysColumn);
-      fetchKeys.then(setMapKeys).catch(() => setMapKeys([]));
-    } else {
+  const canFetchKeys = Boolean((isMapColumn || isJSONColumn) && selectedColumn && database && table);
+  // Whenever the key-fetch inputs change (including on mount) and the column has no keys to fetch,
+  // drop any keys and selected key, during render rather than in the fetch Effect below.
+  const keyFetchInputs = [datasource, database, table, selectedColumn, isMapColumn, isJSONColumn, jsonKeysColumn];
+  const [prevKeyFetchInputs, setPrevKeyFetchInputs] = useState<unknown[] | undefined>(undefined);
+  if (!prevKeyFetchInputs || keyFetchInputs.some((input, i) => input !== prevKeyFetchInputs[i])) {
+    setPrevKeyFetchInputs(keyFetchInputs);
+    if (!canFetchKeys) {
       setMapKeys([]);
       setSelectedMapKey('');
     }
-  }, [datasource, database, table, selectedColumn, isMapColumn, isJSONColumn, jsonKeysColumn]);
+  }
+
+  useEffect(() => {
+    if (!canFetchKeys) {
+      return;
+    }
+    const fetchKeys = isMapColumn
+      ? datasource.fetchUniqueMapKeys(selectedColumn, database, table)
+      : datasource.fetchUniqueJSONPaths(selectedColumn, database, table, jsonKeysColumn);
+    fetchKeys.then(setMapKeys).catch(() => setMapKeys([]));
+  }, [canFetchKeys, datasource, database, table, selectedColumn, isMapColumn, isJSONColumn, jsonKeysColumn]);
 
   const columnOptions: Array<ComboboxOption<string>> = allColumns.map((column) => ({
     label: column.label || column.name,

@@ -23,4 +23,14 @@ describe('TraceIdInput', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith('test');
   });
+
+  it('shows the trace ID it is given and follows a change from outside the input', () => {
+    const result = render(<TraceIdInput traceId="abc" onChange={() => {}} />);
+    const idInput = result.getByTestId(selectors.components.QueryBuilder.TraceIdInput.input);
+    expect(idInput).toHaveValue('abc');
+
+    result.rerender(<TraceIdInput traceId="def" onChange={() => {}} />);
+
+    expect(idInput).toHaveValue('def');
+  });
 });

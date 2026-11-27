@@ -127,6 +127,14 @@ describe('parseSelect', () => {
     expect(parseSelect(sql)?.hasSetOperation).toBe(true);
   });
 
+  it('keeps the first SELECT and set operator of a set operation', () => {
+    const sql = 'WITH 1 AS n SELECT a FROM t1 UNION ALL SELECT b FROM t2 EXCEPT SELECT c FROM t3';
+    const node = parseSelect(sql);
+    expect(node?.firstSelect?.begin).toBe(sql.indexOf('SELECT'));
+    expect(node?.firstSetOperator?.begin).toBe(sql.indexOf('UNION'));
+    expect(node?.token.begin).toBe(sql.lastIndexOf('SELECT'));
+  });
+
   it.each([
     ['a single select', 'SELECT a FROM t1'],
     ['an EXCEPT column modifier', 'SELECT * EXCEPT (secret) FROM otel_logs'],

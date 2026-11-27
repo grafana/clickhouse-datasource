@@ -270,6 +270,71 @@ describe('Suggestions', () => {
   });
 });
 
+describe('Inserting a Grafana variable', () => {
+  const schema: Schema = {
+    databases: async (): Promise<string[]> => ['otel'],
+    tables: async (): Promise<string[]> => ['otel_logs'],
+    columns: async (): Promise<TableColumn[]> => [],
+    functions: async (): Promise<SqlFunction[]> => [],
+    defaultDatabase: 'otel',
+  };
+
+  // `sql` marks the cursor with `|`. Returns what picking `${table}` would insert.
+  const inserted = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.indexOf('|');
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition,
+    };
+    const suggestions = await getSuggestions(sql.replace('|', ''), schema, range, cursorPosition);
+    return suggestions.find((s) => s.label === '${table}');
+  };
+
+  it.each([
+    ['nothing of it is typed', 'SELECT * FROM otel_logs WHERE x = |', '${table}'],
+    ['a `$` is typed', 'SELECT * FROM otel_logs WHERE x = $|', '{table}'],
+    ['part of the name is typed after `$`', 'SELECT * FROM otel_logs WHERE x = $ta|', '{table}'],
+    ['`${` is typed as the FROM table', 'SELECT * FROM ${|', 'table}'],
+    ['the editor closed the brace after `${`', 'SELECT * FROM ${|}', 'table'],
+  ])('inserts only what is missing when %s', async (_label, sql, insertText) => {
+    expect(await inserted(sql)).toMatchObject({ insertText, filterText: 'table' });
+  });
+
+  // What the query reads after picking `${table}` at `|`. Monaco replaces the word typed before the
+  // cursor, which stops at `$` and `{`, and keeps the text after the cursor.
+  const afterPicking = async (sql: string) => {
+    const [before, after] = sql.split('|');
+    const { insertText } = (await inserted(sql))!;
+    return before.replace(/\w*$/, () => insertText) + after;
+  };
+
+  it.each([
+    ['after `$`', 'SELECT * FROM otel_logs WHERE x = $|', 'SELECT * FROM otel_logs WHERE x = ${table}'],
+    ['after `${`', 'SELECT * FROM ${|', 'SELECT * FROM ${table}'],
+    ['after `${` with the brace the editor closed', 'SELECT * FROM ${|}', 'SELECT * FROM ${table}'],
+    [
+      'after `$` in a map, keeping the map brace',
+      "SELECT * FROM otel_logs WHERE x = {'a': $|}",
+      "SELECT * FROM otel_logs WHERE x = {'a': ${table}}",
+    ],
+    [
+      'after `${` in a map, with the brace the editor closed',
+      "SELECT * FROM otel_logs WHERE x = {'a': ${|}}",
+      "SELECT * FROM otel_logs WHERE x = {'a': ${table}}",
+    ],
+  ])('closes the variable once %s', async (_label, sql, result) => {
+    expect(await afterPicking(sql)).toBe(result);
+  });
+});
+
 describe('Suggestions for JOIN targets and set operations', () => {
   const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
   const schema: Schema = {
@@ -392,5 +457,168 @@ describe('Suggestions for JSON path columns (#2193)', () => {
 
     expect(suggestions).toContainEqual(['attributes.level', 'attributes.level', 'attributes.level']);
     expect(suggestions).toContainEqual(['attributes.weird key', 'attributes.weird key', 'attributes.`weird key`']);
+  });
+});
+
+describe('Suggestions in queries with CTEs', () => {
+  const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
+  const tableColumns: Record<string, TableColumn[]> = {
+    'otel.otel_logs': [column('ServiceName'), column('Body'), column('Timestamp')],
+    'telemetry.otel_metrics_histogram': [column('TimeUnix'), column('MetricName'), column('Count')],
+    'default.logs': [column('Severity'), column('Message')],
+  };
+  const schema: Schema = {
+    databases: async () => ['otel', 'telemetry'],
+    tables: async () => ['otel_logs'],
+    columns: async (db: string, table: string) => tableColumns[`${db}.${table}`] ?? [column('WRONG_TABLE')],
+    functions: async () => [],
+    defaultDatabase: 'default',
+  };
+
+  // `sql` marks the cursor with `|`.
+  const fieldsAt = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.indexOf('|');
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    const suggestions = await getSuggestions(sql.replace('|', ''), schema, range, cursorPosition);
+    return suggestions.filter((s) => s.kind === 3);
+  };
+  const labels = async (sql: string) => (await fieldsAt(sql)).map((s) => s.label);
+
+  it('suggests the table columns inside a CTE body that is still being typed', async () => {
+    expect(await labels('WITH per_series AS (SELECT count() FROM otel.otel_logs WHERE |')).toEqual([
+      'ServiceName',
+      'Body',
+      'Timestamp',
+    ]);
+  });
+
+  it('suggests the table columns inside a finished CTE body', async () => {
+    expect(await labels('WITH x AS (SELECT count() FROM otel.otel_logs WHERE |) SELECT * FROM x')).toContain(
+      'ServiceName'
+    );
+  });
+
+  it('suggests the columns a CTE passes through with *', async () => {
+    expect(await labels('WITH x AS (SELECT * FROM otel.otel_logs) SELECT * FROM x WHERE |')).toEqual([
+      'ServiceName',
+      'Body',
+      'Timestamp',
+    ]);
+  });
+
+  it('suggests only the columns and aliases a CTE selects', async () => {
+    const sql =
+      'WITH x AS (SELECT ServiceName, count() AS n, toStartOfHour(Timestamp) AS h FROM otel.otel_logs GROUP BY ServiceName, h) SELECT * FROM x WHERE |';
+    expect(await labels(sql)).toEqual(['ServiceName', 'n', 'h']);
+  });
+
+  it('follows chained CTEs to the table', async () => {
+    const sql = 'WITH a AS (SELECT * FROM otel.otel_logs), b AS (SELECT *, 1 AS one FROM a) SELECT * FROM b WHERE |';
+    expect(await labels(sql)).toEqual(['ServiceName', 'Body', 'Timestamp', 'one']);
+  });
+
+  it('resolves a CTE named in the FROM of another CTE body', async () => {
+    const sql = 'WITH a AS (SELECT ServiceName AS svc FROM otel.otel_logs), b AS (SELECT * FROM a WHERE |';
+    expect(await labels(sql)).toEqual(['svc']);
+  });
+
+  it('takes the columns of the CTE the FROM names when there are several', async () => {
+    const sql =
+      'WITH a AS (SELECT 1 AS from_a FROM otel.otel_logs), b AS (SELECT 2 AS from_b FROM otel.otel_logs) SELECT * FROM b WHERE |';
+    expect(await labels(sql)).toEqual(['from_b']);
+  });
+
+  it('ranks CTE columns with table columns', async () => {
+    const [first] = await fieldsAt('WITH x AS (SELECT 1 AS n FROM otel.otel_logs) SELECT * FROM x WHERE |');
+    expect(first.sortText).toBe('!!!!n');
+  });
+
+  // ClickHouse resolves a CTE that is still being resolved as a table, so the inner `logs` reads the
+  // table `logs`.
+  it('reads the table a CTE names inside its own body', async () => {
+    expect(await labels('WITH logs AS (SELECT * FROM logs) SELECT * FROM logs WHERE |')).toEqual([
+      'Severity',
+      'Message',
+    ]);
+  });
+
+  it.each([
+    ['in its select list', 'WITH logs AS (SELECT | FROM logs) SELECT * FROM logs'],
+    ['in its select list while the body is still being typed', 'WITH logs AS (SELECT | FROM logs'],
+    ['in a subquery of its body', 'WITH logs AS (SELECT * FROM (SELECT | FROM logs)) SELECT * FROM logs'],
+  ])('suggests the table columns inside a CTE body that names the CTE %s', async (_label, sql) => {
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
+  it('reads the table when two CTEs name each other', async () => {
+    const sql = 'WITH logs AS (SELECT * FROM b), b AS (SELECT * FROM logs) SELECT * FROM logs WHERE |';
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
+  // In the body of `logs`, `b` reads the CTE, and the `logs` that `b` reads is the table, because
+  // `logs` is still being defined there.
+  it('reads the table when two CTEs name each other, inside the first body', async () => {
+    const sql = 'WITH logs AS (SELECT | FROM b), b AS (SELECT * FROM logs) SELECT * FROM logs';
+    expect(await labels(sql)).toEqual(['Severity', 'Message']);
+  });
+
+  // In a set operation the first select names the columns.
+  it.each([
+    [
+      'its select list',
+      'WITH x AS (SELECT ServiceName AS svc FROM otel.otel_logs UNION ALL SELECT MetricName FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['svc'],
+    ],
+    [
+      'the table its * reads',
+      'WITH x AS (SELECT * FROM otel.otel_logs UNION ALL SELECT * FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['ServiceName', 'Body', 'Timestamp'],
+    ],
+    [
+      'its select list when it has no FROM',
+      'WITH x AS (SELECT 1 AS one UNION ALL SELECT MetricName FROM telemetry.otel_metrics_histogram) SELECT * FROM x WHERE |',
+      ['one'],
+    ],
+  ])('takes the columns of the first select of a UNION in a CTE: %s', async (_label, sql, expected) => {
+    expect(await labels(sql)).toEqual(expected);
+  });
+
+  describe('in an OTel histogram query built from CTEs', () => {
+    const query = (perSeriesCursor: string, finalCursor: string) => `WITH 60 AS step_s,
+per_series AS (
+  SELECT toStartOfInterval(TimeUnix, INTERVAL step_s SECOND) AS t, SeriesHash AS sh,
+    multiIf(Attributes['success'] = 'false', 'failed', 'success') AS outcome,
+    argMax(toFloat64(Count), TimeUnix) AS v
+  FROM telemetry.otel_metrics_histogram
+  WHERE MetricName = 'm' AND $__conditionalAll(ServiceName IN (\${service:singlequote}), $service) AND ${perSeriesCursor}
+  GROUP BY t, sh, outcome
+),
+lagged AS (
+  SELECT t, outcome, v,
+    lagInFrame(v, 1, toFloat64(-1)) OVER (PARTITION BY sh ORDER BY t ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS pv
+  FROM per_series
+)
+SELECT t AS time, outcome AS series, sum(multiIf(pv < 0, 0, v >= pv, v - pv, v)) / step_s AS value
+FROM lagged WHERE t >= $__fromTime AND ${finalCursor}
+GROUP BY time, series ORDER BY time`;
+
+    it('suggests the histogram table columns in the WHERE of per_series', async () => {
+      expect(await labels(query('|', ''))).toEqual(['TimeUnix', 'MetricName', 'Count']);
+    });
+
+    it('suggests the columns of lagged in the outer WHERE', async () => {
+      expect(await labels(query('', '|'))).toEqual(['t', 'outcome', 'v', 'pv']);
+    });
   });
 });

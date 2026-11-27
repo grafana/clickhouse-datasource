@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { InlineField, InlineFormLabel, Input } from '@grafana/ui';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -18,9 +18,9 @@ interface MinIntervalEditorProps {
 export const useMinIntervalDraft = (minInterval: string | undefined, onCommit: (minInterval: string) => void) => {
   const propValue = minInterval || '';
   const [draft, setDraft] = useState<string>(propValue);
-  const lastPropValue = useRef<string>(propValue);
-  if (lastPropValue.current !== propValue) {
-    lastPropValue.current = propValue;
+  const [lastPropValue, setLastPropValue] = useState<string>(propValue);
+  if (lastPropValue !== propValue) {
+    setLastPropValue(propValue);
     setDraft(propValue);
   }
 

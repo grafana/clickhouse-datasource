@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { css, cx } from '@emotion/css';
 import { InlineField, InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
@@ -82,15 +82,18 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     ...customColumns,
   ];
 
-  useEffect(() => {
-    if (allColumns.length === 0) {
-      return;
-    }
-
-    const columnNames = selectedColumns.map((c) => c.name);
-    const customColumns = getCustomColumns(columnNames, allColumns);
-    setCustomColumns(customColumns);
-  }, [allColumns, selectedColumns]);
+  // Recompute during render when the inputs change. While the schema is empty (still loading, or
+  // reloading for a new table) keep the last result rather than dropping it.
+  const [prevInputs, setPrevInputs] = useState<[readonly TableColumn[], SelectedColumn[]]>();
+  if (allColumns.length > 0 && (allColumns !== prevInputs?.[0] || selectedColumns !== prevInputs?.[1])) {
+    setPrevInputs([allColumns, selectedColumns]);
+    setCustomColumns(
+      getCustomColumns(
+        selectedColumns.map((c) => c.name),
+        allColumns
+      )
+    );
+  }
 
   const onChange = (selected: Array<SelectableValue<string>>): void => {
     setIsOpen(false);

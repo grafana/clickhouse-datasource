@@ -47,6 +47,7 @@ export const getBuilderOptions = (query?: CHQuery): QueryBuilderOptions | undefi
  */
 export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): boolean => {
   return (
+    Boolean(builderOptions.metric?.name) ||
     (builderOptions.columns?.length || 0) > 0 ||
     (builderOptions.filters?.length || 0) > 0 ||
     (builderOptions.orderBy?.length || 0) > 0 ||
@@ -375,6 +376,10 @@ const quoteTraceIdValueToken = (sql: string): string => {
   return sql.includes(`'${token}'`) ? sql : sql.replaceAll(token, `'${token}'`);
 };
 
+/** The frame field that carries the trace and logs links, matched by name in any case. */
+const isTraceIdField = (field: DataFrame['fields'][number]): boolean =>
+  field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id';
+
 /**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view on the explore page
@@ -409,9 +414,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
 
     const originalBuilderOptions = getBuilderOptions(originalQuery);
 
-    const traceField = frame.fields.find(
-      (field) => field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id'
-    );
+    const traceField = frame.fields.find(isTraceIdField);
     if (!traceField) {
       continue;
     }
@@ -819,6 +822,56 @@ const isBackendLabelsField = (field: DataFrame['fields'][number]): boolean => {
 };
 
 /**
+ * Reads one `labels` value as an object. Values may be parsed objects or JSON-object strings; anything
+ * else reads as an empty object.
+ */
+const parseLabelsValue = (raw: unknown): Record<string, unknown> => {
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = {};
+    }
+  }
+  return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+};
+
+/**
+ * Writes the values of `sourceFields` into `labelsField` under their field names. Empty values are
+ * skipped and the rest are stored as strings. Each `labels` value is written back in the shape it
+ * arrived in. The caller removes the source fields from the frame.
+ */
+const writeFieldsIntoLabels = (
+  frame: DataFrame,
+  labelsField: DataFrame['fields'][number],
+  sourceFields: Array<DataFrame['fields'][number]>
+): void => {
+  const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
+
+  // Fold every column into `labels` with a single parse/serialize per row, rather than one
+  // round trip per column per row (which is quadratic on a wide table).
+  for (let i = 0; i < rowLen; i++) {
+    const raw = labelsField.values[i];
+    const obj = parseLabelsValue(raw);
+
+    let folded = false;
+    for (const src of sourceFields) {
+      const v = src.values[i];
+      if (v === null || v === undefined || v === '') {
+        continue;
+      }
+      obj[src.name] = typeof v === 'string' ? v : String(v);
+      folded = true;
+    }
+
+    if (folded) {
+      labelsField.values[i] = typeof raw === 'string' ? JSON.stringify(obj) : obj;
+    }
+  }
+};
+
+/**
  * Folds the datasource's configured extra log columns (the "Columns" setting,
  * jsonData.logs.additionalColumns) into the frame's `labels` field under their
  * plain names, so they surface as flat, filterable fields alongside the grouped
@@ -913,44 +966,107 @@ export const foldDiscoveredLogFieldsIntoLabels = (
       frame.fields.push(labelsField);
     }
 
-    // Fold every column into `labels` with a single parse/serialize per row, rather than one
-    // round trip per column per row (which is quadratic on a wide table).
-    for (let i = 0; i < rowLen; i++) {
-      // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
-      // or already-parsed objects (a frame we just created). Handle both and write back in kind.
-      const raw = labelsField.values[i];
-      const wasString = typeof raw === 'string';
-      let obj: Record<string, unknown>;
-      if (wasString) {
-        try {
-          obj = JSON.parse(raw as string) as Record<string, unknown>;
-        } catch {
-          obj = {};
-        }
-      } else {
-        obj = (raw as Record<string, unknown>) || {};
-      }
-      if (!obj || typeof obj !== 'object') {
-        obj = {};
-      }
-
-      let folded = false;
-      for (const src of sourceFields) {
-        const v = src.values[i];
-        if (v === null || v === undefined || v === '') {
-          continue;
-        }
-        obj[src.name] = typeof v === 'string' ? v : String(v);
-        folded = true;
-      }
-
-      if (folded) {
-        labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
-      }
-    }
+    writeFieldsIntoLabels(frame, labelsField, sourceFields);
 
     const foldedNames = new Set(sourceFields.map((f) => f.name));
     frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
+  }
+
+  return res;
+};
+
+/**
+ * Field names that keep their role in a SQL logs frame: Grafana reads the level, the row id and the
+ * nanosecond timestamp by name, and `timestamp` and `body` are the time and log line aliases the docs
+ * recommend.
+ */
+const sqlLogRoleFieldNames = new Set(['timestamp', 'body', 'level', 'detected_level', 'id', 'tsNs']);
+
+/**
+ * Reports whether any row has a label key that getLabelDisplayTypeFromFrame puts in a named group: a
+ * key from an OTel attribute map that the backend merged into `labels`.
+ */
+const hasGroupedLabelKey = (
+  datasource: Datasource,
+  frame: DataFrame,
+  labelsField: DataFrame['fields'][number]
+): boolean =>
+  labelsField.values.some((raw, rowIndex) =>
+    Object.keys(parseLabelsValue(raw)).some(
+      (key) => datasource.getLabelDisplayTypeFromFrame(key, frame, rowIndex) !== null
+    )
+  );
+
+/**
+ * Folds the plain columns of a SQL editor logs query into the frame's `labels` field under their own
+ * names, and removes them as standalone frame fields, when the frame's labels hold OTel attributes.
+ *
+ * On Grafana 12.4 and later, log details show plain fields (columns that are not labels and have no
+ * data links) only beside the labels that getLabelDisplayTypeFromFrame leaves ungrouped, or on a row
+ * without labels. A SQL query that selects ResourceAttributes, ScopeAttributes or LogAttributes gets
+ * only prefixed label keys from the backend, which all go to named groups, so columns such as
+ * ServiceName and the level would be missing from log details. Folded, the columns are ungrouped
+ * labels, and Grafana lists them with the remaining plain fields under "Fields", next to the attribute
+ * groups. Labels keep the frame field names, so filter-for keys on the same name as before.
+ *
+ * Unlike the builder, which folds only the configured Columns, every plain column folds here: a SQL
+ * query has no column list to tell picked columns apart. A Table panel on such a query shows them
+ * inside `labels`, next to the attributes the backend already merged there.
+ *
+ * The exclusions follow the builder's fold (foldDiscoveredLogFieldsIntoLabels):
+ *   - Role fields stay: the time, the log line (Grafana shows the first string field), the level, the
+ *     row id, and the trace ID, which carries the trace and logs links.
+ *   - Fields with data links stay, so their links still render.
+ *   - Only string, number and boolean fields fold. Date/time fields would serialize to a raw epoch,
+ *     and Map, Array and JSON fields have no scalar label value.
+ *   - Context columns stay, so getLogContextColumnsFromLogRow can match them by name.
+ *
+ * A frame whose labels hold no grouped key is left as is: a query without attribute maps, or with its
+ * own Map aliased AS labels, already shows its plain fields.
+ */
+export const foldSqlLogFieldsIntoLabels = (
+  datasource: Datasource,
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse
+): DataQueryResponse => {
+  const contextColumns = new Set(datasource.getLogContextColumnNames().map((c) => c.split('[')[0]));
+  const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
+
+  for (const frame of (res.data as DataFrame[]) || []) {
+    const target = targetsByRefId.get(frame.refId ?? '');
+    // The backend merges the attribute maps into `labels` only on logs frames.
+    if (target?.editorType !== EditorType.SQL || frame.meta?.preferredVisualisationType !== 'logs') {
+      continue;
+    }
+
+    // Grafana reads labels only from a `labels` field of type other.
+    const labelsField = frame.fields.find((f) => f.name === labelsFieldName && f.type === FieldType.other);
+    if (!labelsField || !hasGroupedLabelKey(datasource, frame, labelsField)) {
+      continue;
+    }
+
+    // Grafana shows the first string field as the log line.
+    const lineField = frame.fields.find((f) => f.type === FieldType.string);
+    const sourceFields = frame.fields.filter(
+      (f) =>
+        f !== labelsField &&
+        f !== lineField &&
+        (f.type === FieldType.string || f.type === FieldType.number || f.type === FieldType.boolean) &&
+        !sqlLogRoleFieldNames.has(f.name) &&
+        !isTraceIdField(f) &&
+        !f.config.links?.length &&
+        !contextColumns.has(f.name)
+    );
+    if (sourceFields.length === 0) {
+      continue;
+    }
+
+    writeFieldsIntoLabels(frame, labelsField, sourceFields);
+
+    // Removed by identity, not by name: a column selected twice (`SELECT Body, Timestamp, *`) can be
+    // the log line, and that copy must stay.
+    const folded = new Set(sourceFields);
+    frame.fields = frame.fields.filter((f) => !folded.has(f));
   }
 
   return res;

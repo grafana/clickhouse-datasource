@@ -40,15 +40,22 @@ export const DatabaseCredentialsSection = (props: Props) => {
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    // Always clear the error eagerly when the user fills in the field,
-    // regardless of whether the ValidationAPI is available.
+  // Always clear the error eagerly when the user fills in the field,
+  // regardless of whether the ValidationAPI is available.
+  const [prevUsername, setPrevUsername] = useState(jsonData.username);
+  if (jsonData.username !== prevUsername) {
+    setPrevUsername(jsonData.username);
     if (jsonData.username) {
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next.username;
         return next;
       });
+    }
+  }
+
+  useEffect(() => {
+    if (jsonData.username) {
       validation?.clearError('username');
     }
     if (!validation) {
@@ -159,8 +166,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
                 external
               >
                 JWT
-              </TextLink>
-              {' '}
+              </TextLink>{' '}
               <Tooltip content="ClickHouse Cloud only" placement="top">
                 <Icon name="info-circle" size="sm" />
               </Tooltip>

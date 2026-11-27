@@ -127,17 +127,19 @@ export const useOtelColumns = (
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
   const prevOtelVersion = useRef<string>(otelVersion);
-  if (!otelEnabled) {
-    didSetColumns.current = false;
-    prevOtelVersion.current = otelVersion;
-  } else if (otelVersion !== prevOtelVersion.current) {
-    // Version changed while OTel is on: reset the flag so the Effect re-applies
-    // the new version's column map ('latest' re-runs auto-detection).
-    didSetColumns.current = false;
-    prevOtelVersion.current = otelVersion;
-  }
 
   useEffect(() => {
+    // Refs are tracked here rather than during render, where they must not be read or written.
+    if (!otelEnabled) {
+      didSetColumns.current = false;
+      prevOtelVersion.current = otelVersion;
+    } else if (otelVersion !== prevOtelVersion.current) {
+      // Version changed while OTel is on: reset the flag so the columns are re-applied from
+      // the new version's column map ('latest' re-runs auto-detection).
+      didSetColumns.current = false;
+      prevOtelVersion.current = otelVersion;
+    }
+
     if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
       return;
     }
@@ -200,16 +202,18 @@ export const useDefaultTimeColumn = (
   );
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn) || hasDefaultColumnConfigured);
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    didSetDefaultTime.current = false;
-  }
-
-  if (Boolean(timeColumn) || otelEnabled) {
-    lastTable.current = table;
-    didSetDefaultTime.current = true;
-  }
 
   useEffect(() => {
+    // Track the table and an already-chosen time column here, in the Effect, rather than during
+    // render: refs must not be read or written while rendering.
+    if (table !== lastTable.current) {
+      didSetDefaultTime.current = false;
+    }
+    if (Boolean(timeColumn) || otelEnabled) {
+      lastTable.current = table;
+      didSetDefaultTime.current = true;
+    }
+
     if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
       return;
     }
@@ -224,16 +228,16 @@ export const useDefaultTimeColumn = (
       return;
     }
 
-    const timeColumn: SelectedColumn = {
+    const defaultTimeColumn: SelectedColumn = {
       name: col.name,
       type: col.type,
       hint: ColumnHint.Time,
     };
 
-    builderOptionsDispatch(setColumnByHint(timeColumn));
+    builderOptionsDispatch(setColumnByHint(defaultTimeColumn));
     lastTable.current = table;
     didSetDefaultTime.current = true;
-  }, [datasource, allColumns, table, builderOptionsDispatch]);
+  }, [datasource, allColumns, table, timeColumn, otelEnabled, builderOptionsDispatch]);
 };
 
 /**
@@ -261,11 +265,13 @@ export const useDefaultLogColumnsByName = (
 ) => {
   const lastTable = useRef<string>(table || '');
   const didRun = useRef<boolean>(!isNewQuery);
-  if (table !== lastTable.current) {
-    didRun.current = false;
-  }
 
   useEffect(() => {
+    // A table change re-arms the fill. Tracked here, not during render, where refs must not be used.
+    if (table !== lastTable.current) {
+      didRun.current = false;
+    }
+
     if (otelEnabled || didRun.current || !table || allColumns.length === 0) {
       return;
     }

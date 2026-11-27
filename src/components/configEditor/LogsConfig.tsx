@@ -94,11 +94,20 @@ export const LogsConfig = (props: LogsConfigProps) => {
   // multiselect (single-table mode only). Resolving the datasource by uid works once it is saved;
   // before that, or when no table is set, the field falls back to a free-text list below.
   const isSingleTable = props.variant === 'single-table';
+  const canFetchColumns = Boolean(isSingleTable && props.uid && defaultTable);
   const [fetchedColumns, setFetchedColumns] = useState<readonly TableColumn[]>([]);
+  // Clear the columns as soon as there is nothing to fetch for, during render rather than in the
+  // Effect. While a table name changes, the previous table's columns stay until the new ones load.
+  const [prevCanFetchColumns, setPrevCanFetchColumns] = useState(canFetchColumns);
+  if (canFetchColumns !== prevCanFetchColumns) {
+    setPrevCanFetchColumns(canFetchColumns);
+    if (!canFetchColumns) {
+      setFetchedColumns([]);
+    }
+  }
   useEffect(() => {
     let ignore = false;
     if (!isSingleTable || !props.uid || !defaultTable) {
-      setFetchedColumns([]);
       return;
     }
     // Debounce so typing the database/table name does not fire a schema read per keystroke, and read

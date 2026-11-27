@@ -93,20 +93,22 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
    * The "key" property is present on these historical entries.
    */
   const queryKey = query.key || '';
-  const lastKey = useRef<string>(queryKey);
-  if (queryKey !== lastKey.current && query.editorType === EditorType.Builder) {
+  const [lastKey, setLastKey] = useState<string>(queryKey);
+  if (queryKey !== lastKey && query.editorType === EditorType.Builder) {
     builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
-    lastKey.current = queryKey;
+    setLastKey(queryKey);
   }
 
   /**
    * Sync builder options when switching from SQL Editor to Query Builder
    */
-  const lastEditorType = useRef<EditorType | undefined>(undefined);
-  if (query.editorType !== lastEditorType.current && query.editorType === EditorType.Builder) {
-    builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
+  const [lastEditorType, setLastEditorType] = useState<EditorType | undefined>(undefined);
+  if (query.editorType !== lastEditorType) {
+    if (query.editorType === EditorType.Builder) {
+      builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
+    }
+    setLastEditorType(query.editorType);
   }
-  lastEditorType.current = query.editorType;
 
   const propBuilderOptions =
     query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
@@ -146,12 +148,16 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   );
 
   // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
+  // Only read by the onChange Effect below, so it is updated in an Effect that runs just before it,
+  // rather than during render, where refs must not be written.
   const shouldSkipChanges = useRef<boolean>(true);
-  if (isBuilderOptionsRunnable(builderOptions)) {
-    // The compact editor converts a query carried over from another data source. Propagating
-    // it here would race that conversion and could put the stale query back.
-    shouldSkipChanges.current = isCarriedOver;
-  }
+  useEffect(() => {
+    if (isBuilderOptionsRunnable(builderOptions)) {
+      // The compact editor converts a query carried over from another data source. Propagating
+      // it here would race that conversion and could put the stale query back.
+      shouldSkipChanges.current = isCarriedOver;
+    }
+  }, [builderOptions, isCarriedOver]);
 
   // Resolve hasTraceTimestampTable for any trace ID query — not only OTel ones.
   // Running this at the CHEditorByType level means the check fires even when
@@ -293,6 +299,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
+      range={props.range}
       minInterval={query.minInterval}
       onQueryChange={onQueryChange}
       onEditAsSql={onEditAsSql}

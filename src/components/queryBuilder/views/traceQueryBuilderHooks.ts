@@ -120,21 +120,19 @@ export const useOtelColumns = (
   const didDetectColumnTypes = useRef<boolean>(false);
   const prevOtelVersion = useRef<string>(otelVersion);
 
-  if (!otelEnabled) {
-    didSetColumns.current = false;
-    didDetectColumnTypes.current = false;
-    prevOtelVersion.current = otelVersion;
-  } else if (otelVersion !== prevOtelVersion.current) {
-    // Version changed while OTel is on — force the Effect to re-dispatch with
-    // the new version's column map.
-    didSetColumns.current = false;
-    didDetectColumnTypes.current = false;
-    prevOtelVersion.current = otelVersion;
-  }
-
   useEffect(() => {
+    // Refs are tracked here rather than during render, where they must not be read or written.
     if (!otelEnabled) {
+      didSetColumns.current = false;
+      didDetectColumnTypes.current = false;
+      prevOtelVersion.current = otelVersion;
       return;
+    }
+    if (otelVersion !== prevOtelVersion.current) {
+      // Version changed while OTel is on: force a re-dispatch with the new version's column map.
+      didSetColumns.current = false;
+      didDetectColumnTypes.current = false;
+      prevOtelVersion.current = otelVersion;
     }
 
     // Both initial dispatch and JSON type detection are already done.
@@ -218,11 +216,13 @@ export const useDefaultTraceColumnsByName = (
 ) => {
   const lastTable = useRef<string>(table || '');
   const didRun = useRef<boolean>(!isNewQuery);
-  if (table !== lastTable.current) {
-    didRun.current = false;
-  }
 
   useEffect(() => {
+    // A table change re-arms the fill. Tracked here, not during render, where refs must not be used.
+    if (table !== lastTable.current) {
+      didRun.current = false;
+    }
+
     if (otelEnabled || didRun.current || !table || allColumns.length === 0) {
       return;
     }

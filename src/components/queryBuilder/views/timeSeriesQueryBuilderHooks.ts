@@ -21,16 +21,18 @@ export const useDefaultTimeColumn = (
 ) => {
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn));
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    didSetDefaultTime.current = false;
-  }
-
-  if (timeColumn) {
-    lastTable.current = table;
-    didSetDefaultTime.current = true;
-  }
 
   useEffect(() => {
+    // Track the table and an already-chosen time column here, in the Effect, rather than during
+    // render: refs must not be read or written while rendering.
+    if (table !== lastTable.current) {
+      didSetDefaultTime.current = false;
+    }
+    if (timeColumn) {
+      lastTable.current = table;
+      didSetDefaultTime.current = true;
+    }
+
     if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
       return;
     }
@@ -40,16 +42,16 @@ export const useDefaultTimeColumn = (
       return;
     }
 
-    const timeColumn: SelectedColumn = {
+    const defaultTimeColumn: SelectedColumn = {
       name: col.name,
       type: col.type,
       hint: ColumnHint.Time,
     };
 
-    builderOptionsDispatch(setColumnByHint(timeColumn));
+    builderOptionsDispatch(setColumnByHint(defaultTimeColumn));
     lastTable.current = table;
     didSetDefaultTime.current = true;
-  }, [allColumns, table, builderOptionsDispatch]);
+  }, [allColumns, table, timeColumn, builderOptionsDispatch]);
 };
 
 export const getDefaultTimeSeriesFilters = (): Filter[] => [

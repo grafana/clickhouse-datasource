@@ -198,6 +198,46 @@
             "type": "string",
             "default": "50"
           },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "defaultDatabase": {
+                "description": "The database holding the OTel metric tables",
+                "type": "string",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              },
+              "exponentialHistogramTable": {
+                "description": "Table with exponential histogram data points (exporter option metrics_tables.exponential_histogram.name)",
+                "type": "string",
+                "default": "otel_metrics_exp_histogram",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              },
+              "gaugeTable": {
+                "description": "Table with gauge data points (exporter option metrics_tables.gauge.name)",
+                "type": "string",
+                "default": "otel_metrics_gauge",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              },
+              "histogramTable": {
+                "description": "Table with histogram data points (exporter option metrics_tables.histogram.name)",
+                "type": "string",
+                "default": "otel_metrics_histogram",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              },
+              "sumTable": {
+                "description": "Table with sum (counter) data points (exporter option metrics_tables.sum.name)",
+                "type": "string",
+                "default": "otel_metrics_sum",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              },
+              "summaryTable": {
+                "description": "Table with summary data points (exporter option metrics_tables.summary.name)",
+                "type": "string",
+                "default": "otel_metrics_summary",
+                "x-dsconfig-depends-on": "jsonData_signalType == 'metrics'"
+              }
+            }
+          },
           "oauthPassThru": {
             "description": "Authenticate using JWT (ClickHouse Cloud only). When enabled, credentials are only used for health checks.",
             "type": "boolean",
@@ -253,7 +293,8 @@
             "default": "logs",
             "enum": [
               "logs",
-              "traces"
+              "traces",
+              "metrics"
             ],
             "x-dsconfig-depends-on": "jsonData_configMode == 'single-table'"
           },

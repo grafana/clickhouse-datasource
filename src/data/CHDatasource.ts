@@ -11,6 +11,7 @@ import {
   DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
   DataSourceWithToggleableQueryFiltersSupport,
+  dateTime,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -44,6 +45,9 @@ import {
   Filter,
   FilterOperator,
   LinkTable,
+  MetricLabel,
+  MetricLabelSource,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   StringFilter,
@@ -55,6 +59,20 @@ import {
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
+import {
+  getConfiguredMetricTables,
+  getMetricCatalogSql,
+  getMetricHealthSql,
+  getMetricLabelKeysSql,
+  getMetricTableFeatures,
+  getMetricLabelValuesSql,
+  getSummaryQuantilesSql,
+  MetricCatalogEntry,
+  MetricHealth,
+  MetricTableFeatures,
+  MetricTables,
+  resolveMetricTables,
+} from './metrics';
 import { AdHocFilter } from './adHocFilter';
 import {
   buildLogLevelAggregateExpressions,
@@ -72,15 +90,22 @@ import {
   getTableIdentifier,
   isStringType,
   logAliasToColumnHints,
+  escapeCHStringLiteral,
 } from './sqlGenerator';
+
+// Re-exported for existing imports; the implementation lives with the other SQL escaping helpers.
+export { escapeCHStringLiteral };
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
   foldDiscoveredLogFieldsIntoLabels,
+  foldSqlLogFieldsIntoLabels,
   labelsFieldName,
   mapGrafanaFormatToQueryType,
   transformQueryResponseWithTraceAndLogLinks,
 } from './utils';
+import { transformMetricHeatmapFrames } from './metricsHeatmap';
+import { transformMetricSeriesNames } from './metricsSeriesNames';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -107,6 +132,22 @@ const isAttributeColumnType = (type?: string): boolean => Boolean(type?.startsWi
 // `<table><suffix>` companion table. The optimization is only safe when the
 // companion actually exposes all of them.
 const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
+
+// The columns of system.functions that the SQL editor reads.
+const SQL_FUNCTION_COLUMNS = [
+  'name',
+  'is_aggregate',
+  'case_insensitive',
+  'alias_to',
+  'origin',
+  'description',
+  'syntax',
+  'arguments',
+  'returned_value',
+  'examples',
+  'categories',
+] as const;
+type SqlFunctionColumn = (typeof SQL_FUNCTION_COLUMNS)[number];
 
 // Row cap for the Map-key discovery probe on free-form tables (no known time
 // column to prune by). Bounds the scan to a sample instead of the whole column.
@@ -1355,6 +1396,173 @@ export class Datasource
     return traceConfig.traceIdColumn;
   }
 
+  getDefaultMetricsDatabase(): string {
+    return this.settings.jsonData.metrics?.defaultDatabase || this.getDefaultDatabase();
+  }
+
+  /** The configured metric table names, with the exporter defaults for unset ones. */
+  getConfiguredMetricTables(): Record<MetricType, string> {
+    return getConfiguredMetricTables(this.settings.jsonData.metrics);
+  }
+
+  /**
+   * Runs a metadata query of the metrics editor as a table. Unlike runQuery, a failed query rejects
+   * instead of resolving with no rows, so the editor shows the error rather than an empty list, and
+   * nothing empty gets cached.
+   */
+  private async fetchMetricsFrame(rawSql: string): Promise<DataFrame> {
+    const response = await firstValueFrom(
+      this.query({
+        targets: [{ rawSql, format: 1, refId: 'metrics-metadata' }],
+        range: this.metricsLookupRange(),
+      } as DataQueryRequest<CHQuery>)
+    );
+    const error = response.errors?.[0];
+    if (error) {
+      throw new Error(error.message || 'Query failed');
+    }
+    return response.data[0] || { fields: [], length: 0 };
+  }
+
+  /**
+   * The range of the metrics editor's metadata lookups. A page without a dashboard range, such as a
+   * new alert rule, falls back to the last 6 hours, the window the discovery queries already read.
+   */
+  private metricsLookupRange(): TimeRange {
+    const range = (getTemplateSrv() as any).timeRange as TimeRange | undefined;
+    if (range?.from && range?.to) {
+      return range;
+    }
+    const to = dateTime();
+    const from = dateTime(to.valueOf() - 6 * 60 * 60 * 1000);
+    return { from, to, raw: { from: from.toISOString(), to: to.toISOString() } };
+  }
+
+  /** The values of a metadata query's column, by name. */
+  private async fetchMetricsColumns(rawSql: string): Promise<(name: string) => unknown[]> {
+    const frame = await this.fetchMetricsFrame(rawSql);
+    return (name) => frame.fields.find((f) => f.name === name)?.values ?? [];
+  }
+
+  /** Memoized metadata lookups; a failed lookup is dropped so the next call retries it. */
+  private metricsCache = new Map<string, Promise<unknown>>();
+  private cachedMetricsLookup<T>(key: string, load: () => Promise<T>): Promise<T> {
+    let promise = this.metricsCache.get(key) as Promise<T> | undefined;
+    if (!promise) {
+      promise = load();
+      promise.catch(() => this.metricsCache.delete(key));
+      this.metricsCache.set(key, promise);
+    }
+    return promise;
+  }
+
+  /**
+   * The metric tables that exist, by type. Looked up once per data source instance, since the
+   * exporter creates its tables up front. A database without a single metric table is not cached:
+   * a dashboard opened before the exporter created them would otherwise stay empty for the life of
+   * the data source, reload button included.
+   */
+  resolveMetricTables(): Promise<MetricTables> {
+    const database = this.getDefaultMetricsDatabase();
+    const key = `tables:${database}`;
+    return this.cachedMetricsLookup(key, async () => {
+      const column = await this.fetchMetricsColumns(`SHOW TABLES FROM ${escapeIdentifier(database)}`);
+      const tables = column('name').map(String);
+      const resolved = resolveMetricTables(this.getConfiguredMetricTables(), tables);
+      if (Object.keys(resolved).length === 0) {
+        this.metricsCache.delete(key);
+      }
+      return resolved;
+    });
+  }
+
+  /** The metrics with data in the last 6 hours of the dashboard time range, across every metric table. */
+  async fetchMetricCatalog(): Promise<MetricCatalogEntry[]> {
+    const rawSql = getMetricCatalogSql(this.getDefaultMetricsDatabase(), await this.resolveMetricTables());
+    if (!rawSql) {
+      return [];
+    }
+    const column = await this.fetchMetricsColumns(rawSql);
+    const [types, units, descriptions, monotonic] = ['type', 'unit', 'description', 'monotonic'].map(column);
+    return column('name').map((name, i) => ({
+      name: String(name),
+      type: types[i] as MetricType,
+      unit: String(units[i] ?? ''),
+      description: String(descriptions[i] ?? ''),
+      isMonotonic: Boolean(Number(monotonic[i])),
+    }));
+  }
+
+  /** The optional features of a metric table, such as JSON attribute columns. */
+  async getMetricTableFeatures(database: string, table: string): Promise<MetricTableFeatures> {
+    const columns = await this.getColumnsCached(database, table);
+    // A failed DESC TABLE resolves with no columns, which reads as a table without an attribute
+    // column, so it is reported instead. The empty list is not kept, so the next pick reads again.
+    if (columns.length === 0) {
+      this._columnCache.delete(this.columnCacheKey(database, table));
+      throw new Error(
+        `Could not read the columns of ${table}. Check that the table exists and that the account can read it.`
+      );
+    }
+    return getMetricTableFeatures(columns);
+  }
+
+  /** The attribute keys a metric has, by source. Empty when key discovery is turned off. */
+  async fetchMetricLabelKeys(
+    database: string,
+    table: string,
+    metricName: string,
+    jsonAttributes?: boolean
+  ): Promise<MetricLabel[]> {
+    if (!this.isMapKeysDiscoveryEnabled()) {
+      return [];
+    }
+    const column = await this.fetchMetricsColumns(getMetricLabelKeysSql(database, table, metricName, jsonAttributes));
+    const sources = column('source');
+    return column('key').map((key, i) => ({ source: sources[i] as MetricLabelSource, key: String(key) }));
+  }
+
+  async fetchMetricLabelValues(
+    database: string,
+    table: string,
+    metricName: string,
+    label: MetricLabel,
+    jsonAttributes?: boolean
+  ): Promise<string[]> {
+    const column = await this.fetchMetricsColumns(
+      getMetricLabelValuesSql(database, table, metricName, label, jsonAttributes)
+    );
+    return column('value').map(String);
+  }
+
+  async fetchSummaryQuantiles(database: string, table: string, metricName: string): Promise<number[]> {
+    const column = await this.fetchMetricsColumns(getSummaryQuantilesSql(database, table, metricName));
+    return column('quantile').map(Number).filter(Number.isFinite);
+  }
+
+  /**
+   * Export interval and shared series of a metric over the last 15 minutes. Cached, since the
+   * editor reads it when a metric is picked and again to show the warning.
+   */
+  fetchMetricHealth(
+    database: string,
+    table: string,
+    metricName: string,
+    type: MetricType,
+    features: MetricTableFeatures = {}
+  ): Promise<MetricHealth> {
+    const key = `health:${database}.${table}:${type}:${metricName}:${JSON.stringify(features)}`;
+    return this.cachedMetricsLookup(key, async () => {
+      const column = await this.fetchMetricsColumns(getMetricHealthSql(database, table, metricName, type, features));
+      const exportInterval = Number(column('export_interval')[0]);
+      return {
+        exportInterval: Number.isFinite(exportInterval) && exportInterval > 0 ? Math.round(exportInterval) : undefined,
+        sharedSeries: Number(column('shared_series')[0] ?? 0),
+        series: Number(column('series')[0] ?? 0),
+      };
+    });
+  }
+
   async fetchDatabases(): Promise<string[]> {
     return this.fetchData('SHOW DATABASES');
   }
@@ -1681,13 +1889,15 @@ export class Datasource
   }
 
   /**
-   * Fetches SQL functions from server.
+   * Fetches SQL functions from server. The COLUMNS matcher reads only the columns of
+   * system.functions that the server has: ClickHouse 22.8 has no description, syntax,
+   * arguments, returned_value, examples or categories (23.3 has description, 23.8 all of
+   * them), and naming a missing column fails the whole query, which left the editor without
+   * function suggestions.
    */
   async fetchSqlFunctions(): Promise<SqlFunction[]> {
     const rawSql = `
-      SELECT
-        name, is_aggregate, case_insensitive, alias_to, origin, description,
-        syntax, arguments, returned_value, examples, categories
+      SELECT COLUMNS('^(${SQL_FUNCTION_COLUMNS.join('|')})$')
       FROM system.functions
       LIMIT 10000
     `;
@@ -1695,19 +1905,21 @@ export class Datasource
     if (frame.fields?.length === 0) {
       return [];
     }
-    const view = new DataFrameView(frame);
+    const view = new DataFrameView<Partial<Record<SqlFunctionColumn, unknown>>>(frame);
+    const text = (value: unknown) => (value === undefined || value === null ? '' : String(value));
     const sqlFunctions: SqlFunction[] = view.map((item) => ({
-      name: String(item[0]),
-      isAggregate: Boolean(item[1]),
-      caseInsensitive: Boolean(item[2]),
-      aliasTo: String(item[3]),
-      origin: String(item[4]),
-      description: String(item[5]),
-      syntax: String(item[6]),
-      arguments: String(item[7]),
-      returnedValue: String(item[8]),
-      examples: String(item[9]),
-      categories: String(item[10]),
+      name: text(item.name),
+      isAggregate: Boolean(item.is_aggregate),
+      caseInsensitive: Boolean(item.case_insensitive),
+      aliasTo: text(item.alias_to),
+      // A server without the column predates user-defined functions, so all of its functions are system ones.
+      origin: item.origin === undefined ? 'System' : text(item.origin),
+      description: text(item.description),
+      syntax: text(item.syntax),
+      arguments: text(item.arguments),
+      returnedValue: text(item.returned_value),
+      examples: text(item.examples),
+      categories: text(item.categories),
     }));
 
     return sqlFunctions;
@@ -1840,9 +2052,12 @@ export class Datasource
     // an empty statement that ClickHouse rejects with a 400. Skip only that transient case. Every
     // other query type runs as before, so an empty or invalid SQL-editor query still surfaces its
     // error to the user instead of being dropped silently.
-    const isBuilderLogsQuery =
-      query.editorType === EditorType.Builder && (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
-    if (isBuilderLogsQuery && !(query.rawSql && query.rawSql.trim().length > 0)) {
+    // A metrics builder query likewise has no SQL until a metric is picked.
+    const builderOptions =
+      query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
+    const isBuilderLogsQuery = builderOptions?.queryType === QueryType.Logs;
+    const isBuilderMetricsQuery = builderOptions?.queryType === QueryType.TimeSeries && Boolean(builderOptions.metric);
+    if ((isBuilderLogsQuery || isBuilderMetricsQuery) && !(query.rawSql && query.rawSql.trim().length > 0)) {
       return false;
     }
 
@@ -1869,6 +2084,9 @@ export class Datasource
         concatMap(async (res: DataQueryResponse) => {
           let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
           transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
+          transformed = foldSqlLogFieldsIntoLabels(this, request, transformed);
+          transformed = transformMetricSeriesNames(request, transformed);
+          transformed = transformMetricHeatmapFrames(request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -2052,6 +2270,10 @@ export class Datasource
    * database that getDefaultDatabase coerces to.
    */
   private getDefaultAdhocSource(): string | undefined {
+    if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode() && this.getSignalType() === 'metrics') {
+      // Metrics span several tables, so ad hoc keys are discovered across the metrics database.
+      return this.getDefaultMetricsDatabase();
+    }
     if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode()) {
       const isTraces = this.getSignalType() === 'traces';
       const signalDb = isTraces ? this.getDefaultTraceDatabase() : this.getDefaultLogsDatabase();
@@ -2750,9 +2972,9 @@ export class Datasource
    * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
    * how to bucket those keys into named, collapsible sections.
    *
-   * Unprefixed keys (folded Columns or a table's own `labels` map) return
-   * null. On a row with labels, Grafana renders plain fields such as the
-   * level only in the null group.
+   * Unprefixed keys (folded Columns, the folded plain columns of a SQL logs
+   * query, or a table's own `labels` map) return null. On a row with labels,
+   * Grafana renders plain fields such as the level only in the null group.
    *
    * Strings are plain English; the plugin codebase does not currently
    * use `@grafana/i18n`, so a future i18n pass would localize these
@@ -2851,14 +3073,6 @@ function isJSONColumnType(type: string | undefined): boolean {
 // Shared empty set returned when a table is known to have no attribute columns
 // of a given kind — avoids per-call allocation.
 const EMPTY_COLUMN_SET: ReadonlySet<string> = new Set();
-
-// Escape a string for embedding inside a single-quoted ClickHouse string
-// literal: backslash and single quote are the only characters that need
-// escaping. Use when interpolating an untrusted identifier (e.g. a Map key
-// from system.columns) into raw SQL.
-export function escapeCHStringLiteral(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
 
 enum AdHocFilterStatus {
   none = 0,

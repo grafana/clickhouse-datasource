@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import allLabels from 'labels';
 import { InlineField, InlineFormLabel, Input } from '@grafana/ui';
 import { selectors } from 'selectors';
@@ -10,13 +10,14 @@ interface TraceIdInputProps {
 }
 
 const TraceIdInput = (props: TraceIdInputProps) => {
-  const [inputId, setInputId] = useState<string>('');
   const { traceId, onChange, disabled } = props;
-  const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.traceIdFilter;
-
-  useEffect(() => {
+  const [inputId, setInputId] = useState<string>(traceId);
+  const [prevTraceId, setPrevTraceId] = useState(traceId);
+  if (traceId !== prevTraceId) {
+    setPrevTraceId(traceId);
     setInputId(traceId);
-  }, [traceId]);
+  }
+  const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.traceIdFilter;
 
   return (
     <InlineField

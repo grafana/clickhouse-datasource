@@ -1,4 +1,4 @@
-import React, { MutableRefObject, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { InlineField, InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
@@ -58,12 +58,15 @@ export type TableSelectProps = {
   database: string;
   table: string;
   onTableChange: (value: string) => void;
-  /** Set by a database change in the dropdown: the kept table is replaced if the new database lacks it. */
-  databaseChanged?: MutableRefObject<boolean>;
+  /**
+   * Reports, and clears, whether the database was just changed in the dropdown: the kept table is
+   * replaced if the new database lacks it.
+   */
+  takeDatabaseChanged?: () => boolean;
 };
 
 export const TableSelect = (props: TableSelectProps) => {
-  const { datasource, onTableChange, database, table, databaseChanged } = props;
+  const { datasource, onTableChange, database, table, takeDatabaseChanged } = props;
   const tables = useTables(datasource, database);
   const { label, tooltip, empty } = labels.components.TableSelect;
 
@@ -80,16 +83,14 @@ export const TableSelect = (props: TableSelectProps) => {
       return;
     }
     // useTables empties the list on a database change, so these are the new database's tables.
-    const missing = Boolean(databaseChanged?.current) && Boolean(table) && !tables.includes(table);
-    if (databaseChanged) {
-      databaseChanged.current = false;
-    }
+    const databaseChanged = takeDatabaseChanged?.() ?? false;
+    const missing = databaseChanged && Boolean(table) && !tables.includes(table);
     // Auto select the default table, when this database has it, or else the first one
     if (!table || missing) {
       const defaultTable = datasource.getDefaultTable();
       onTableChange(defaultTable && tables.includes(defaultTable) ? defaultTable : tables[0]);
     }
-  }, [database, table, tables, datasource, onTableChange, databaseChanged]);
+  }, [database, table, tables, datasource, onTableChange, takeDatabaseChanged]);
 
   return (
     <InlineField
@@ -129,6 +130,11 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
     }
     onDatabaseChange(value);
   };
+  const takeDatabaseChanged = useCallback(() => {
+    const changed = databaseChanged.current;
+    databaseChanged.current = false;
+    return changed;
+  }, []);
 
   return (
     <InlineFieldRow>
@@ -138,7 +144,7 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
         database={database}
         table={table}
         onTableChange={onTableChange}
-        databaseChanged={databaseChanged}
+        takeDatabaseChanged={takeDatabaseChanged}
       />
     </InlineFieldRow>
   );
