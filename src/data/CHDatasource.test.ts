@@ -1820,6 +1820,11 @@ describe('ClickHouseDatasource', () => {
       ]);
       expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
+    it('should keep dollar signs in the condition literal', async () => {
+      const rawSql = `select stuff from table where $__conditionalAll(match(name, '^$name$') AND note != '$$', $name) and other = 1;`;
+      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'name', current: { value: 'val1' } } as any]);
+      expect(val).toEqual(`select stuff from table where match(name, '^$name$') AND note != '$$' and other = 1;`);
+    });
   });
 
   describe('fetchPathsForJSONColumns', () => {
