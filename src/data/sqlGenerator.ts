@@ -490,10 +490,10 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
 
   const aggregateSelectParts: string[] = [];
   options.aggregates?.forEach((agg) => {
-    const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+    const alias = getAggregateAlias(agg.alias);
     const name = `${agg.aggregateType}(${agg.column})`;
-    aggregateSelectParts.push(`${name}${alias}`);
-    selectNames.add(alias ? alias.substring(4) : name);
+    aggregateSelectParts.push(`${name}${alias ? ` as ${alias}` : ''}`);
+    selectNames.add(alias || name);
   });
 
   options.groupBy?.forEach((g) => {
@@ -573,9 +573,9 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
   options.groupBy?.forEach((g) => selectParts.push(g));
 
   options.aggregates?.forEach((agg) => {
-    const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+    const alias = getAggregateAlias(agg.alias);
     const name = `${agg.aggregateType}(${agg.column})`;
-    selectParts.push(`${name}${alias}`);
+    selectParts.push(`${name}${alias ? ` as ${alias}` : ''}`);
   });
 
   const selectPartsSql = selectParts.join(', ');
@@ -631,10 +631,10 @@ const generateTableQuery = (options: QueryBuilderOptions): string => {
 
   if (isAggregateMode) {
     options.aggregates?.forEach((agg) => {
-      const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+      const alias = getAggregateAlias(agg.alias);
       const name = `${agg.aggregateType}(${agg.column})`;
-      selectParts.push(`${name}${alias}`);
-      selectNames.add(alias ? alias.substring(4) : name);
+      selectParts.push(`${name}${alias ? ` as ${alias}` : ''}`);
+      selectNames.add(alias || name);
     });
 
     options.groupBy?.forEach((g) => {
@@ -794,6 +794,18 @@ const convertTimeFieldToMilliseconds = (columnIdentifier: string) =>
 /**
  * Concatenates query parts with no empty spaces.
  */
+/**
+ * Returns the alias for an aggregate, with spaces replaced by underscores. An alias that is still not a plain
+ * identifier (it has a hyphen or a dot, or starts with a digit) is quoted, since ClickHouse rejects it bare.
+ */
+const getAggregateAlias = (alias?: string): string => {
+  const normalized = alias?.replace(/ /g, '_');
+  if (!normalized) {
+    return '';
+  }
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(normalized) ? normalized : escapeIdentifier(normalized);
+};
+
 const concatQueryParts = (parts: readonly string[]): string => {
   let query = '';
   for (let i = 0; i < parts.length; i++) {
