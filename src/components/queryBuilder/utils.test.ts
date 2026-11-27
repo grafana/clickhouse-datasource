@@ -380,10 +380,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
     }
@@ -401,10 +403,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -423,10 +427,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -445,10 +451,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -467,9 +475,11 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'createddate',
           operator: FilterOperator.WithInGrafanaTimeRange,
           type: 'datetime',
+          condition: 'AND',
         } as DateFilterWithoutValue,
       ],
       limit: undefined,
@@ -488,9 +498,11 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'closedate',
           operator: FilterOperator.OutsideGrafanaTimeRange,
           type: 'datetime',
+          condition: 'AND',
         } as DateFilterWithoutValue,
       ],
       limit: undefined,
@@ -705,8 +717,38 @@ describe('getQueryOptionsFromSql', () => {
     const options = getQueryOptionsFromSql(sql);
     expect(typeof options).not.toBe('string');
     expect((options as QueryBuilderOptions).filters).toEqual([
-      { key: 'Timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
+      {
+        filterType: 'custom',
+        key: 'Timestamp',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        type: 'datetime',
+        condition: 'AND',
+      },
     ]);
+  });
+
+  // ── Casing regression tests ──────────────────────────────────────────────
+  // Previously pgsql-ast-parser lowercased all unquoted identifiers, corrupting
+  // ClickHouse's case-sensitive column / table names. These tests verify the
+  // WASM-backed parser preserves original casing.
+
+  it('preserves original casing of unquoted column identifiers', () => {
+    const sql = 'SELECT StageName, EventType FROM "db"."foo"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.columns!.map((c) => c.name)).toEqual(['StageName', 'EventType']);
+  });
+
+  it('preserves original casing of quoted column identifiers', () => {
+    const sql = 'SELECT "Timestamp", "SeverityText" FROM "db"."foo"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.columns!.map((c) => c.name)).toEqual(['Timestamp', 'SeverityText']);
+  });
+
+  it('preserves casing of table and database names', () => {
+    const sql = 'SELECT name FROM "MyDB"."MyTable"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.database).toBe('MyDB');
+    expect(opts.table).toBe('MyTable');
   });
 
   describe('letter case of names, which ClickHouse compares exactly', () => {
@@ -759,7 +801,15 @@ describe('getQueryOptionsFromSql', () => {
   describe('IS NULL and IS NOT NULL', () => {
     it('gives the filter its column and a type', () => {
       const options = getQueryOptionsFromSql('SELECT Body FROM "otel"."otel_logs" WHERE SeverityText IS NOT NULL');
-      expect(options.filters).toEqual([{ key: 'SeverityText', operator: FilterOperator.IsNotNull, type: 'string' }]);
+      expect(options.filters).toEqual([
+        {
+          filterType: 'custom',
+          key: 'SeverityText',
+          operator: FilterOperator.IsNotNull,
+          type: 'string',
+          condition: 'AND',
+        },
+      ]);
     });
 
     it('starts a new filter after IS NULL', () => {
@@ -770,6 +820,21 @@ describe('getQueryOptionsFromSql', () => {
         ['TraceId', FilterOperator.IsNull, undefined],
         ['ServiceName', FilterOperator.Equals, 'cart'],
       ]);
+    });
+  });
+
+  describe('WHERE conditions', () => {
+    it('keeps each AND and OR with the filter after it', () => {
+      const sql = `SELECT Body FROM "otel"."otel_logs" WHERE ( ServiceName = 'cart' ) AND ( SeverityText = 'ERROR' ) OR ( SeverityText = 'WARN' )`;
+      expect(generateSql(getQueryOptionsFromSql(sql))).toBe(sql);
+    });
+
+    it('refuses a macro call that the builder cannot show', () => {
+      expect(() =>
+        getQueryOptionsFromSql(
+          'SELECT Body FROM "otel"."otel_logs" WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)'
+        )
+      ).toThrow('The WHERE clause calls $__conditionalAll, which the query builder cannot show.');
     });
   });
 
