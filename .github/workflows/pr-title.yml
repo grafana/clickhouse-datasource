@@ -11,9 +11,11 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency group on purpose. Renovate opens a PR and edits its body seconds
+# later, so the opened and edited runs overlap. Cancelling one (or a queued one
+# being replaced, with cancel-in-progress: false) leaves a `cancelled` check run on
+# the commit, and Renovate counts the branch as pending until it's gone, so
+# automerge never happens. The job takes seconds, so letting every run finish is cheap.
 
 jobs:
   check-title:
