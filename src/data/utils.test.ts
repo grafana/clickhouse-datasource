@@ -883,6 +883,25 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       out?.data[0]?.fields[0]?.config?.links?.find((link: any) => link.title === 'View logs')?.internal
         ?.query as CHBuilderQuery;
 
+    it('opens both links from a dashboard over the time range of the panel', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+      configureOtelTraces(mockDatasource);
+
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Table, columns: [{ name: 'a' }] });
+      const out = await transformQueryResponseWithTraceAndLogLinks(
+        mockDatasource,
+        { ...request, app: CoreApp.Dashboard },
+        response
+      );
+
+      const links: any[] = out?.data[0]?.fields[0]?.config?.links || [];
+      expect(links.map((link) => link.title)).toEqual(['View trace', 'View logs']);
+      for (const link of links) {
+        expect(link.internal.range).toBe(request.range);
+      }
+    });
+
     it('trace→logs link seeds default filters including the time-range bound', async () => {
       const mockDatasource = newMockDatasource();
       configureOtelLogs(mockDatasource);
