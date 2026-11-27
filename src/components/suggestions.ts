@@ -25,7 +25,7 @@ export interface Schema {
   defaultDatabase?: string;
 }
 
-// A CTE that the FROM of the cursor's select level reads from, with the CTEs visible there.
+// A CTE that a FROM or JOIN of the cursor's select level reads from, with the CTEs visible there.
 interface CursorCte {
   name: string;
   body: SelectQueryNode;
@@ -34,13 +34,31 @@ interface CursorCte {
   resolving: Set<SelectQueryNode>;
 }
 
+// A table, or a CTE, that a FROM or JOIN of the cursor's select reads, with its names unquoted.
+interface ColumnSource {
+  database?: string;
+  table: string;
+  alias?: string;
+  // What a column of this source is qualified with: its alias, else its table, as written.
+  qualifier: string;
+  cte?: CursorCte;
+}
+
+// The alias of an ARRAY JOIN (`ARRAY JOIN Events AS e`) and the array column it reads.
+interface ArrayJoinAlias {
+  alias: string;
+  column: string;
+}
+
 interface CursorData {
   clause: ClauseType;
   identifiers: string[];
   database?: string;
   table?: string;
   prefix?: string;
-  cte?: CursorCte;
+  // The tables and CTEs that the FROM and JOINs of the cursor's select read.
+  sources: ColumnSource[];
+  arrayJoins: ArrayJoinAlias[];
 
   begin: number;
   end: number;
@@ -52,30 +70,36 @@ function getCursorInSelectQueryNode(
   outerScope: Map<string, SelectQueryNode> = new Map(),
   resolving: Set<SelectQueryNode> = new Set()
 ): CursorData {
+  // The selects at this level: those of a set operation (UNION, INTERSECT, EXCEPT), else just one.
+  // Each has its own SELECT, clauses and tables, so the cursor is read in the one it is in.
+  const branches = root.branches ?? [{ begin: 0, token: root.token, from: root.from }];
+  let index = 0;
+  while (index + 1 < branches.length && branches[index + 1].begin <= cursorPosition) {
+    index++;
+  }
+  const { begin: branchBegin, token: select, from } = branches[index];
+
   // A query that starts with WITH has no SELECT token until its outer SELECT is typed, for example
   // while the cursor is still in the first CTE body.
-  const head = root.token ?? root.children?.[0]?.token;
+  const head = select ?? root.children?.[0]?.token;
   const cursorData: CursorData = {
     clause: ClauseType.None,
     identifiers: [],
+    sources: [],
+    arrayJoins: [],
     begin: head?.begin ?? 0,
     end: head?.end ?? 0,
   };
 
-  if (root.token && cursorPosition > root.token.end) {
+  if (select && cursorPosition > select.end) {
     cursorData.clause = ClauseType.Select;
   }
 
   // The CTEs defined at this level and the ones around it; an inner name wins.
   const scope = new Map([...outerScope, ...(root.withAliases ?? [])]);
-  if (root.from) {
-    cursorData.database = root.from.database;
-    cursorData.table = root.from.table;
-    // Inside a CTE body the CTE's own name reads the table, as in ClickHouse.
-    const body = cteNamedBy(root.from, scope);
-    if (body && !resolving.has(body)) {
-      cursorData.cte = { name: root.from.table!, body, scope, resolving };
-    }
+  if (from) {
+    cursorData.database = from.database;
+    cursorData.table = from.table;
   }
 
   if (!root.children) {
@@ -100,6 +124,10 @@ function getCursorInSelectQueryNode(
 
         break;
       default:
+        // The clauses of an earlier select do not carry over to the cursor's.
+        if (node.token.begin < branchBegin) {
+          break;
+        }
         cursorData.end = node.token.end;
         if (node.type === QueryNodeType.From) {
           const fromNode = node as FromQueryNode;
@@ -138,24 +166,42 @@ function getCursorInSelectQueryNode(
     }
   }
 
-  // In a FROM position the target being typed is the outer FROM or the last JOIN
-  // whose keyword the cursor has passed. The parser reads a JOIN target as a From
-  // node too, as it does a FROM inside a function call (`EXTRACT(DAY FROM ts)`),
-  // which is not a target. When the target is `$`-prefixed (`${t}` or `${db}.`,
-  // as in the typingVariable check below), surface it so a JOIN target gets
-  // variable completions, not just the first FROM. The clause guard keeps this
-  // from changing a later clause's column context.
-  if (cursorData.clause === ClauseType.From) {
-    let target: FromQueryNode | undefined;
-    for (const node of root.children) {
-      if (
-        node.type === QueryNodeType.From &&
-        (node === root.from || node.token.matchKeyword('JOIN')) &&
-        node.token.end < cursorPosition
-      ) {
-        target = node;
+  // The FROM and JOIN targets of the cursor's select. While its FROM is not typed yet, the select
+  // before it lends its tables, since the selects of a set operation return the same columns.
+  let targetIndex = index;
+  while (targetIndex > 0 && !branches[targetIndex].from) {
+    targetIndex--;
+  }
+  const targetBranch = branches[targetIndex];
+  const targetEnd = branches[targetIndex + 1]?.begin ?? Infinity;
+  const targets = root.children.filter(
+    (node): node is FromQueryNode =>
+      node.type === QueryNodeType.From &&
+      // The parser reads a JOIN target as a From node too, as it does a FROM inside a function
+      // call (`EXTRACT(DAY FROM ts)`), which is not a target.
+      (node === targetBranch.from || node.token.matchKeyword('JOIN')) &&
+      node.token.begin >= targetBranch.begin &&
+      node.token.begin < targetEnd
+  );
+  for (const target of targets) {
+    if (!target.arrayJoin) {
+      const source = columnSource(target, scope, resolving);
+      if (source) {
+        cursorData.sources.push(source);
       }
+    } else if (target.alias && target.table) {
+      const column = [target.database, target.table].filter((part) => part !== undefined).join('.');
+      cursorData.arrayJoins.push({ alias: target.alias, column });
     }
+  }
+
+  // In a FROM position the target being typed is the outer FROM or the last JOIN
+  // whose keyword the cursor has passed. When the target is `$`-prefixed (`${t}`
+  // or `${db}.`, as in the typingVariable check below), surface it so a JOIN
+  // target gets variable completions, not just the first FROM. The clause guard
+  // keeps this from changing a later clause's column context.
+  if (cursorData.clause === ClauseType.From) {
+    const target = targets.filter((node) => node.token.end < cursorPosition).pop();
     if (target && (target.table || target.database || '').startsWith('$')) {
       cursorData.database = target.database;
       cursorData.table = target.table;
@@ -247,6 +293,8 @@ async function getSuggestionsFromCursorData(
     [ClauseType.OrderBy]: 'column',
     [ClauseType.Limit]: 'keyword',
     [ClauseType.Identifier]: 'column',
+    [ClauseType.On]: 'column',
+    [ClauseType.Using]: 'column',
   };
 
   if (data.database && !data.table) {
@@ -290,6 +338,13 @@ async function getSuggestionsFromCursorData(
       break;
 
     case 'column':
+      // After a qualifier that names a table (`l.`, `otel_logs.`), only that table's columns can follow.
+      const qualified = await fetchQualifiedFieldSuggestions(schema, range, text, data);
+      if (qualified) {
+        results = qualified;
+        break;
+      }
+
       const macros = await getMacroSuggestions(range, data.prefix);
       results.push(...macros);
       const variables = await getVariableSuggestions(range, typed);
@@ -312,13 +367,8 @@ async function getSuggestionsFromCursorData(
       const sqlFunctions = await fetchFunctionSuggestions(schema, range);
       results.push(...sqlFunctions);
 
-      if (data.cte) {
-        results.push(...(await fetchCteFieldSuggestions(schema, range, text, data.cte, data.prefix)));
-      } else if (data.table) {
-        const database = data.database || schema.defaultDatabase || 'default';
-        const columns = await fetchFieldSuggestions(schema, range, database, data.table, data.prefix);
-        results.push(...columns);
-      }
+      const inUsing = data.clause === ClauseType.Using;
+      results.push(...(await fetchSourceFieldSuggestions(schema, range, text, data.sources, data.prefix, inUsing)));
 
       break;
     case 'keyword':
@@ -385,8 +435,119 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database: str
 // JSON path such as payload.`weird key` parses.
 const quoteColumnSegments = (name: string): string => name.split('.').map(quoteColumnIfUnsafe).join('.');
 
-async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
-  return columnSuggestions(await schema.columns(db, table), range, prefix);
+// The table or CTE that a FROM or JOIN target reads, or undefined for a table function, a subquery
+// or a table name that is not typed yet.
+function columnSource(
+  target: FromQueryNode,
+  scope: Map<string, SelectQueryNode>,
+  resolving: Set<SelectQueryNode>
+): ColumnSource | undefined {
+  if (!target.table || target.isTableFunction) {
+    return undefined;
+  }
+  const table = unquoteIdentifier(target.table);
+  const database = target.database === undefined ? undefined : unquoteIdentifier(target.database);
+  if (table === undefined || (target.database !== undefined && database === undefined)) {
+    return undefined;
+  }
+  // Inside a CTE body the CTE's own name reads the table, as in ClickHouse.
+  const body = cteNamedBy(target, scope);
+  return {
+    database,
+    table,
+    alias: target.alias === undefined ? undefined : unquoteIdentifier(target.alias),
+    qualifier: target.alias ?? target.table,
+    cte: body && !resolving.has(body) ? { name: target.table, body, scope, resolving } : undefined,
+  };
+}
+
+// The source that the qualifier of a prefix names (`l.Sev`, `otel_logs.`, `otel.otel_logs.`), by its
+// alias, its table or its database and table, with the rest of the prefix after the qualifier.
+function qualifiedSource(prefix: string, sources: ColumnSource[], defaultDatabase: string) {
+  const [first, ...rest] = prefix.split('.');
+  if (!rest.length) {
+    return undefined;
+  }
+  const [second, ...more] = rest;
+  const byDatabase = more.length
+    ? sources.find((s) => s.table === second && (s.database ?? defaultDatabase) === first)
+    : undefined;
+  if (byDatabase) {
+    return { source: byDatabase, rest: more.join('.') };
+  }
+  const source = sources.find((s) => s.alias === first) ?? sources.find((s) => s.table === first);
+  return source && { source, rest: rest.join('.') };
+}
+
+async function sourceColumns(schema: Schema, text: string, source: ColumnSource): Promise<TableColumn[]> {
+  if (source.cte) {
+    return cteSourceColumns(schema, text, source.cte);
+  }
+  return schema.columns(source.database || schema.defaultDatabase || 'default', source.table);
+}
+
+// The columns of every table that the cursor's select reads. A name that several of them have is
+// offered once for each, qualified with its alias or table name, because ClickHouse silently reads
+// a bare shared name from the left table of the join, which may not be the one meant.
+async function fetchSourceFieldSuggestions(
+  schema: Schema,
+  range: Range,
+  text: string,
+  sources: ColumnSource[],
+  prefix?: string,
+  inUsing = false
+) {
+  const columns = await Promise.all(sources.map((source) => sourceColumns(schema, text, source)));
+  const owners = new Map<string, number>();
+  for (const names of columns.map((list) => new Set(list.map((c) => c.name)))) {
+    names.forEach((name) => owners.set(name, (owners.get(name) ?? 0) + 1));
+  }
+  // USING takes bare names, and a dotted prefix is a path inside one column (`Events.`), which a
+  // qualifier cannot precede.
+  const qualifyShared = !inUsing && !prefix?.includes('.');
+  const shared = (c: TableColumn) => qualifyShared && (owners.get(c.name) ?? 0) > 1;
+  const own = (c: TableColumn) => !shared(c);
+  return sources.flatMap((source, i) => [
+    ...columnSuggestions(columns[i].filter(own), range, prefix),
+    ...columnSuggestions(columns[i].filter(shared), range, prefix, source.qualifier),
+  ]);
+}
+
+// After a qualifier that names a table of the cursor's select (`l.`, `otel_logs.`,
+// `otel.otel_logs.`), or an ARRAY JOIN alias, only its columns can follow. Undefined for any other
+// prefix.
+async function fetchQualifiedFieldSuggestions(schema: Schema, range: Range, text: string, data: CursorData) {
+  if (!data.prefix) {
+    return undefined;
+  }
+  const defaultDatabase = schema.defaultDatabase || 'default';
+  const qualified = qualifiedSource(data.prefix, data.sources, defaultDatabase);
+  if (qualified) {
+    return columnSuggestions(await sourceColumns(schema, text, qualified.source), range, qualified.rest);
+  }
+  const [alias, ...rest] = data.prefix.split('.');
+  const arrayJoin = rest.length ? data.arrayJoins.find((a) => a.alias === alias) : undefined;
+  if (!arrayJoin) {
+    return undefined;
+  }
+  // `ARRAY JOIN Events AS e` reads one element of Events per row, so the columns under it, such as
+  // `Events.Name`, become `e.Name`, typed as one element. A qualified column (`ARRAY JOIN t.Events`)
+  // is in that table; a bare one can be in any of them.
+  const owner = qualifiedSource(`${arrayJoin.column}.`, data.sources, defaultDatabase);
+  const path = owner?.rest ?? `${arrayJoin.column}.`;
+  const columns = await Promise.all(
+    (owner ? [owner.source] : data.sources).map((source) => sourceColumns(schema, text, source))
+  );
+  const fields = columns
+    .flat()
+    .filter((c) => c.name.startsWith(path))
+    .map((c) => ({
+      ...c,
+      name: c.name.substring(path.length),
+      label: c.name.substring(path.length),
+      type: c.type.replace(/^Array\((.*)\)$/, '$1'),
+    }));
+  return columnSuggestions(fields, range, rest.join('.'));
 }
 
 // The CTE an unqualified FROM target names, when one with that name is in scope.
@@ -425,9 +586,10 @@ function cteColumns(
 
   const scope = new Map([...outerScope, ...(body.withAliases ?? [])]);
   // In a UNION or another set operation, the first select names the columns.
-  const select = body.firstSelect ?? body.token;
-  const end = body.firstSetOperator?.begin ?? nodeEnd(body);
-  const from = body.from && body.from.token.begin < end ? body.from : undefined;
+  const [first, second] = body.branches ?? [{ begin: 0, token: body.token, from: body.from }];
+  const select = first.token ?? body.token;
+  const end = second?.operator?.begin ?? nodeEnd(body);
+  const from = first.from;
   for (const item of selectListItems(text, select.end, from?.token.begin ?? end)) {
     if (item.outputName) {
       columns.names.push(item.outputName);
@@ -454,12 +616,12 @@ function cteColumns(
   return columns;
 }
 
-async function fetchCteFieldSuggestions(schema: Schema, range: Range, text: string, cte: CursorCte, prefix?: string) {
+async function cteSourceColumns(schema: Schema, text: string, cte: CursorCte): Promise<TableColumn[]> {
   const { names, tables } = cteColumns(text, cte.body, cte.scope, new Set(cte.resolving));
-  const suggestions: monacoTypes.languages.CompletionItem[] = [];
+  const columns: TableColumn[] = [];
   for (const { database, table } of tables) {
     const db = database || schema.defaultDatabase || 'default';
-    suggestions.push(...(await fetchFieldSuggestions(schema, range, db, table, prefix)));
+    columns.push(...(await schema.columns(db, table)));
   }
   // The schema knows no type for a column the CTE computes, so the detail names the CTE instead.
   const named = names.map((name): TableColumn => ({
@@ -468,26 +630,28 @@ async function fetchCteFieldSuggestions(schema: Schema, range: Range, text: stri
     type: `Column of ${cte.name}`,
     picklistValues: [],
   }));
-  suggestions.push(...columnSuggestions(named, range, prefix));
-  return suggestions;
+  columns.push(...named);
+  return columns;
 }
 
-function columnSuggestions(columns: TableColumn[], range: Range, prefix?: string) {
+// `qualifier` prefixes the label and the inserted name, as in `l.TraceId`.
+function columnSuggestions(columns: TableColumn[], range: Range, prefix?: string, qualifier?: string) {
   // Monaco replaces and scores only the word at the cursor, and `.` ends a word,
   // so the insert and filter texts start after the last dot of the prefix.
   const typedSegments = prefix ? prefix.lastIndexOf('.') + 1 : 0;
+  const qualify = (name: string) => (qualifier ? `${qualifier}.${name}` : name);
   return columns
+    .filter((c) => !prefix || c.label!.toLowerCase().startsWith(prefix.toLowerCase()))
     .map((c) => ({
-      label: c.label!,
+      label: qualify(c.label!),
       kind: monaco.languages.CompletionItemKind.Field,
       sortText: `!!!!${c.label}`,
       detail: c.type,
       documentation: c.type,
       filterText: c.name.substring(typedSegments),
-      insertText: quoteColumnSegments(c.name.substring(typedSegments)),
+      insertText: qualify(quoteColumnSegments(c.name.substring(typedSegments))),
       range,
-    }))
-    .filter((c) => !prefix || c.label.toLowerCase().startsWith(prefix.toLowerCase()));
+    }));
 }
 
 async function fetchFunctionSuggestions(schema: Schema, range: Range) {
