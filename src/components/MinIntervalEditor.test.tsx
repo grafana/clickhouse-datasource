@@ -7,6 +7,15 @@ import { selectors } from 'selectors';
 const input = () => screen.getByTestId(selectors.components.QueryEditor.MinIntervalEditor.input);
 
 describe('MinIntervalEditor', () => {
+  it('follows a value changed from outside the input', () => {
+    const { rerender } = render(<MinIntervalEditor minInterval="5m" onMinIntervalChange={() => {}} />);
+    fireEvent.change(input(), { target: { value: '10' } });
+
+    rerender(<MinIntervalEditor minInterval="1h" onMinIntervalChange={() => {}} />);
+
+    expect(input()).toHaveValue('1h');
+  });
+
   it('renders the current value', () => {
     render(<MinIntervalEditor minInterval="5m" onMinIntervalChange={() => {}} />);
     expect(input()).toHaveValue('5m');

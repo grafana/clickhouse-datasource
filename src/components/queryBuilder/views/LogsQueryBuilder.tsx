@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
 import { ColumnRolesHelp } from '../ColumnRolesHelp';
@@ -242,13 +242,14 @@ interface LogMessageLikeInputProps {
 }
 
 const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
-  const [input, setInput] = useState<string>('');
   const { logMessageLike, onChange } = props;
-  const { label, tooltip, clearButton } = allLabels.components.LogsQueryBuilder.logMessageFilter;
-
-  useEffect(() => {
+  const [input, setInput] = useState<string>(logMessageLike);
+  const [prevLogMessageLike, setPrevLogMessageLike] = useState(logMessageLike);
+  if (logMessageLike !== prevLogMessageLike) {
+    setPrevLogMessageLike(logMessageLike);
     setInput(logMessageLike);
-  }, [logMessageLike]);
+  }
+  const { label, tooltip, clearButton } = allLabels.components.LogsQueryBuilder.logMessageFilter;
 
   return (
     <InlineFieldRow>

@@ -142,6 +142,45 @@ describe('FilterPopover', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('re-seeds the form when pointed at a different filter', async () => {
+    const onAddFilter = jest.fn();
+    const datasource = createMockDatasource();
+    const popover = (filter: Filter) => (
+      <FilterPopover
+        datasource={datasource}
+        database="default"
+        table="otel_logs"
+        allColumns={allColumns}
+        onAddFilter={onAddFilter}
+        filter={filter}
+        onClose={jest.fn()}
+      />
+    );
+    const { rerender } = render(
+      popover({
+        filterType: 'custom',
+        key: 'Body',
+        type: 'String',
+        operator: FilterOperator.Like,
+        condition: 'AND',
+        value: 'worker',
+      })
+    );
+
+    const next: Filter = {
+      filterType: 'custom',
+      key: 'Body',
+      type: 'String',
+      operator: FilterOperator.Equals,
+      condition: 'AND',
+      value: 'scheduler',
+    };
+    rerender(popover(next));
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    expect(onAddFilter).toHaveBeenCalledWith(next);
+  });
+
   it('keeps an IN filter as an array and keeps its condition when updating without changes', async () => {
     const onAddFilter = jest.fn();
     const existingFilter: Filter = {

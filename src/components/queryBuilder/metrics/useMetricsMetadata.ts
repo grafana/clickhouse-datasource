@@ -12,24 +12,34 @@ interface AsyncState<T> {
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : typeof error === 'string' ? error : 'Request failed';
 
+interface Settled<T> {
+  key: string;
+  value: T;
+  error?: string;
+}
+
 /**
  * Runs `load` whenever `key` changes and keeps the latest result. A stale response, from a key
- * that has since changed, is dropped. An empty key skips loading and resets to `initial`.
+ * that has since changed, is dropped. An empty key skips loading and resets to `initial`. While a
+ * new key loads, the previous key's value stays, marked as loading.
  */
 const useAsync = <T>(key: string, initial: T, load: () => Promise<T>): AsyncState<T> => {
-  const [state, setState] = useState<AsyncState<T>>({ value: initial, loading: Boolean(key) });
+  // The last settled result, tagged with the key it was loaded for, so loading and the reset are
+  // derived during render rather than set from the Effect.
+  const [settled, setSettled] = useState<Settled<T>>();
+  if (!key && settled) {
+    setSettled(undefined);
+  }
 
   useEffect(() => {
     if (!key) {
-      setState({ value: initial, loading: false });
       return;
     }
 
     let cancelled = false;
-    setState((previous) => ({ value: previous.value, loading: true }));
     load().then(
-      (value) => !cancelled && setState({ value, loading: false }),
-      (error: unknown) => !cancelled && setState({ value: initial, loading: false, error: errorMessage(error) })
+      (value) => !cancelled && setSettled({ key, value }),
+      (error: unknown) => !cancelled && setSettled({ key, value: initial, error: errorMessage(error) })
     );
     return () => {
       cancelled = true;
@@ -38,7 +48,13 @@ const useAsync = <T>(key: string, initial: T, load: () => Promise<T>): AsyncStat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return state;
+  if (!key) {
+    return { value: initial, loading: false };
+  }
+  if (settled?.key === key) {
+    return { value: settled.value, loading: false, error: settled.error };
+  }
+  return { value: settled ? settled.value : initial, loading: true };
 };
 
 const emptyTables: MetricTables = {};

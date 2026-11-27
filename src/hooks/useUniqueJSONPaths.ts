@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
+interface FetchedPaths {
+  datasource: Datasource;
+  key: string;
+  paths: string[];
+}
+
 const useUniqueJSONPaths = (
   datasource: Datasource,
   jsonColumn: string,
@@ -8,15 +14,23 @@ const useUniqueJSONPaths = (
   table: string,
   keysColumn?: string
 ): readonly string[] => {
-  const [paths, setPaths] = useState<string[]>([]);
+  // Results are tagged with the inputs they were fetched for, so a change of inputs reads as empty
+  // straight away instead of showing the previous column's paths until the new fetch lands.
+  const [fetched, setFetched] = useState<FetchedPaths>();
+  const enabled = Boolean(datasource && jsonColumn && database && table);
+  const key = JSON.stringify([jsonColumn, database, table, keysColumn]);
+  const isCurrent = enabled && fetched?.datasource === datasource && fetched.key === key;
+  // Drop a result once the inputs move away from it, so coming back to the same inputs starts
+  // empty and waits for a fresh fetch (and stays empty if that fetch fails), as before.
+  if (fetched && !isCurrent) {
+    setFetched(undefined);
+  }
 
   useEffect(() => {
-    if (!datasource || !jsonColumn || !database || !table) {
-      setPaths([]);
+    if (!enabled) {
       return;
     }
 
-    setPaths([]);
     let ignore = false;
     datasource
       .fetchUniqueJSONPaths(jsonColumn, database, table, keysColumn)
@@ -24,7 +38,7 @@ const useUniqueJSONPaths = (
         if (ignore) {
           return;
         }
-        setPaths(result);
+        setFetched({ datasource, key, paths: result });
       })
       .catch((ex: any) => {
         console.error('Failed to fetch JSON paths for column:', jsonColumn, database, table, ex);
@@ -33,9 +47,11 @@ const useUniqueJSONPaths = (
     return () => {
       ignore = true;
     };
-  }, [datasource, jsonColumn, database, table, keysColumn]);
+  }, [enabled, key, datasource, jsonColumn, database, table, keysColumn]);
 
-  return paths;
+  return isCurrent ? fetched.paths : EMPTY;
 };
+
+const EMPTY: readonly string[] = [];
 
 export default useUniqueJSONPaths;

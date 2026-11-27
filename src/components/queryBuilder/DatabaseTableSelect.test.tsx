@@ -127,19 +127,24 @@ describe('TableSelect after a database change', () => {
     mockDs.fetchTables = jest.fn((db?: string) => Promise.resolve(tablesByDb[db!] ?? []));
     mockDs.getDefaultTable = jest.fn(() => '');
     const onTableChange = jest.fn();
-    const databaseChanged = { current: false };
+    let databaseChanged = false;
+    const takeDatabaseChanged = () => {
+      const changed = databaseChanged;
+      databaseChanged = false;
+      return changed;
+    };
     const select = (database: string) => (
       <TableSelect
         datasource={mockDs}
         database={database}
         table="logs"
         onTableChange={onTableChange}
-        databaseChanged={databaseChanged}
+        takeDatabaseChanged={takeDatabaseChanged}
       />
     );
     const result = render(select('db_a'));
     const changeDatabase = (database: string) => {
-      databaseChanged.current = changedInDropdown;
+      databaseChanged = changedInDropdown;
       result.rerender(select(database));
     };
     return { mockDs, onTableChange, changeDatabase };
