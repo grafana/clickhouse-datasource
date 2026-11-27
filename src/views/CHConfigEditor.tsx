@@ -277,7 +277,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     options.jsonData.defaultTable ||
     options.jsonData.dialTimeout ||
     options.jsonData.queryTimeout ||
-    options.jsonData.validateSql ||
+    options.jsonData.validateSql === false ||
     options.jsonData.enableSecureSocksProxy ||
     options.jsonData.customSettings ||
     options.jsonData.logs ||

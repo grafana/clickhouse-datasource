@@ -434,9 +434,9 @@
               "type": "string"
             },
             "validateSql": {
-              "description": "Validate SQL in the editor.",
+              "description": "While you edit a query in the SQL editor, marks syntax errors and unknown columns, functions and tables before it runs. After a pause in typing, the editor asks ClickHouse to explain the query (EXPLAIN QUERY TREE, or EXPLAIN AST for a query with a scalar subquery), which reads no data. Dashboards run their queries as before. Defaults to enabled.",
               "type": "boolean",
-              "default": false
+              "default": true
             },
             "version": {
               "description": "Plugin version that last wrote this configuration. Stamped by the config editor's useConfigDefaults hook on every save; frontend-only.",

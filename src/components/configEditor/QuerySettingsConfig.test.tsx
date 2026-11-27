@@ -86,6 +86,15 @@ describe('QuerySettingsConfig', () => {
     expect(onValidateSqlChange).toHaveBeenCalledWith(expect.any(Object));
   });
 
+  it('shows Validate SQL as on unless the data source turned it off', () => {
+    const unset = render(<QuerySettingsConfig {...baseProps} />);
+    expect(unset.getAllByRole('checkbox')[0]).toBeChecked();
+    unset.unmount();
+
+    const off = render(<QuerySettingsConfig {...baseProps} validateSql={false} />);
+    expect(off.getAllByRole('checkbox')[0]).not.toBeChecked();
+  });
+
   it('should call onEnableMapKeysDiscoveryChange when changed', () => {
     const onEnableMapKeysDiscoveryChange = jest.fn();
     const result = render(

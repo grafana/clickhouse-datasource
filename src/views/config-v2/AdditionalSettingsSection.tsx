@@ -138,7 +138,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             !!jsonData.maxOpenConns ||
             !!jsonData.queryTimeout ||
             !!jsonData.rowCapacityHint ||
-            !!jsonData.validateSql ||
+            jsonData.validateSql === false ||
             jsonData.enableMapKeysDiscovery === false ||
             !isEqual(logs, defaultLogs) ||
             !isEqual(traces, defaultTraces)
