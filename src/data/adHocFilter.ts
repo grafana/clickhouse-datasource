@@ -1,7 +1,7 @@
 import { AdHocVariableFilter } from '@grafana/data';
 import { Lexer } from 'ch-parser/lexer';
 import { TokenType } from 'ch-parser/types';
-import { getTable } from './ast';
+import { getSelectAliases, getTable, SelectAlias } from './ast';
 import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './jsonPath';
 
 // OTel-standard Map columns. Retained as a fallback so behavior does not
@@ -9,9 +9,62 @@ import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './j
 // construct AdHocFilter directly without going through the datasource).
 const DEFAULT_MAP_COLUMNS: ReadonlySet<string> = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
 
+/** Whether a filter applies to a query, and why not when it does not. */
+export interface FilterApplicability {
+  applies: boolean;
+  reason?: string;
+}
+
+/**
+ * The notice for a query that leaves some of `adHocFilters` out, with one
+ * sentence per reason, or undefined when the query takes every filter. For
+ * example: `Filter "level = info" isn't applied here: otel.otel_traces has no
+ * column level.`
+ */
+export function leftOutFiltersNotice(
+  adHocFilters: AdHocVariableFilter[],
+  applicability: FilterApplicability[]
+): string | undefined {
+  const labelsByReason = new Map<string, string[]>();
+  applicability.forEach((result, i) => {
+    if (!result.applies) {
+      const reason = result.reason ?? '';
+      labelsByReason.set(reason, [...(labelsByReason.get(reason) ?? []), `"${filterLabel(adHocFilters[i])}"`]);
+    }
+  });
+  if (labelsByReason.size === 0) {
+    return undefined;
+  }
+  return [...labelsByReason]
+    .map(([reason, labels]) => {
+      const list =
+        labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+      const subject = labels.length === 1 ? `Filter ${list} isn't` : `Filters ${list} aren't`;
+      // A reason is a sentence of its own, so one that starts with "The" goes on in lower case.
+      return `${subject} applied here: ${reason.replace(/^The /, 'the ')}`;
+    })
+    .join(' ');
+}
+
+// A filter as the filter bar shows it: `level = info`, or `level =| info, warn` with several values.
+function filterLabel(filter: AdHocVariableFilter): string {
+  return `${filter.key} ${filter.operator} ${filter.values?.length ? filter.values.join(', ') : filter.value}`;
+}
+
+// Where a query's filters go.
+interface FilterScope {
+  // The table the filters are keyed to.
+  table: string;
+  // Leave out a filter whose key names another table.
+  tableQualifiedKeys: boolean;
+  // The aliases the query's SELECT defines over the table.
+  aliases?: ReadonlyMap<string, SelectAlias>;
+}
+
 export class AdHocFilter {
   private _targetTable = '';
   private _mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS;
+  private _tableColumns = new Map<string, ReadonlySet<string>>();
 
   setTargetTableFromQuery(query: string) {
     // Reset first so that if getTable() throws (its pgsql AST can't parse some
@@ -47,10 +100,34 @@ export class AdHocFilter {
   }
 
   /**
+   * Record the columns of `table`, named as `getTable` returns it. A filter on a
+   * column the table does not have is then left out of that table's filters, so
+   * the query keeps working instead of failing with an unknown identifier. A
+   * table without recorded columns gets every filter, as before.
+   */
+  setTableColumns(table: string, columns: Iterable<string>) {
+    this._tableColumns.set(table, new Set(columns));
+  }
+
+  hasTableColumns(table: string): boolean {
+    return this._tableColumns.has(table);
+  }
+
+  /**
+   * The table the filters of `sql` are keyed to, or '' when there is none. An
+   * explicit target set via setTargetTableFromQuery (the tag-source path) takes
+   * precedence over the table the query reads.
+   */
+  resolveTargetTable(sql: string): string {
+    return this._targetTable !== '' ? this._targetTable : getTable(sql);
+  }
+
+  /**
    * Render the filters as the body of an `additional_table_filters` entry. With
-   * `targetTable`, filters whose key names a different table are left out.
-   * Without `tableQualifiedKeys`, a dotted key that is no Map or JSON access is
-   * a column whose name has dots, and is kept whole.
+   * `targetTable`, filters whose key names a different table, or whose column
+   * the table is known not to have, are left out. Without `tableQualifiedKeys`,
+   * a dotted key that is no Map or JSON access is a column whose name has dots,
+   * and is kept whole.
    */
   buildFilterString(
     adHocFilters: AdHocVariableFilter[],
@@ -58,31 +135,12 @@ export class AdHocFilter {
     targetTable?: string,
     tableQualifiedKeys = true
   ): string {
-    if (!adHocFilters || adHocFilters.length === 0) {
-      return '';
-    }
-
-    const validFilters = adHocFilters
-      .filter((filter: AdHocVariableFilter) => {
-        const valid = isValid(filter);
-        if (!valid) {
-          console.warn('Invalid adhoc filter will be ignored:', filter);
-        }
-        return valid;
-      })
-      .filter((filter) => targetTable === undefined || appliesToTable(filter.key, targetTable, this._mapColumns));
-
-    const filters = validFilters
-      .map((f, i) => {
-        const key = escapeKey(f.key, useJSON, this._mapColumns, tableQualifiedKeys);
-        const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
-        const condition = i !== validFilters.length - 1 ? toCondition(f.condition) : '';
-        const operator = convertOperatorToClickHouseOperator(f.operator);
-        return ` ${key} ${operator} ${value} ${condition}`;
-      })
-      .join('');
-
-    return filters;
+    return this.renderFilters(
+      adHocFilters,
+      useJSON,
+      targetTable === undefined ? undefined : { table: targetTable, tableQualifiedKeys },
+      tableQualifiedKeys
+    );
   }
 
   /** @internal — exposed for tests; returns the active Map-column set. */
@@ -93,42 +151,21 @@ export class AdHocFilter {
   /**
    * Append the ad-hoc filters to `sql` as an `additional_table_filters`
    * setting on the query's table. With `tableQualifiedKeys`, a filter applies
-   * only to the table its key names.
+   * only to the table its key names. A key that is an alias in the query's
+   * SELECT filters the aliased expression, and a filter on a column the table
+   * is known not to have is left out.
    */
   apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false, tableQualifiedKeys = true): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
 
-    // Resolve the target table for THIS query. An explicit target set via
-    // setTargetTableFromQuery (the tag-source path) takes precedence; otherwise
-    // resolve from this query. A single AdHocFilter is shared across panels, so
-    // a query-derived target is intentionally not cached back onto the instance:
-    // caching it would let the first panel to render decide the table for every
-    // later panel.
-    const explicitTarget = this._targetTable !== '';
-    const targetTable = explicitTarget ? this._targetTable : getTable(sql);
-
-    if (targetTable === '') {
+    const scope = this.scopeFor(sql, tableQualifiedKeys);
+    if ('reason' in scope) {
       return sql;
     }
 
-    // Only re-check that the target appears in this query for an explicit
-    // tag-source target; a target just parsed from this same query is by
-    // definition present, and the ASCII \b guard would only produce false
-    // negatives for non-ASCII or spaced names. Quoting is stripped first (e.g.
-    // "default"."table" or `default`.`table`) and the name is regex-escaped so a
-    // name with regex metacharacters (e.g. `a[b`) neither throws nor mismatches.
-    if (explicitTarget && !sql.replace(/["`]/g, '').match(new RegExp(`.*\\b${escapeRegExp(targetTable)}\\b.*`, 'gi'))) {
-      return sql;
-    }
-
-    const filters = this.buildFilterString(
-      adHocFilters,
-      useJSON,
-      tableQualifiedKeys ? targetTable : undefined,
-      tableQualifiedKeys
-    );
+    const filters = this.renderFilters(adHocFilters, useJSON, scope);
 
     if (filters === '') {
       return sql;
@@ -138,7 +175,128 @@ export class AdHocFilter {
     sql = stripStatementTerminator(sql);
     // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
     // the settings clause and silently drop the filter.
-    return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;
+    return `${sql}\nsettings additional_table_filters={'${scope.table}' : '${filters}'}`;
+  }
+
+  /**
+   * Whether `apply` would add each of `adHocFilters` to `sql`, with the reason
+   * when it would not, in the same order as the filters.
+   */
+  applicability(
+    sql: string,
+    adHocFilters: AdHocVariableFilter[],
+    useJSON = false,
+    tableQualifiedKeys = true
+  ): FilterApplicability[] {
+    const scope = this.scopeFor(sql, tableQualifiedKeys);
+    return adHocFilters.map((filter) => {
+      if ('reason' in scope) {
+        return { applies: false, reason: scope.reason };
+      }
+      if (!isValid(filter)) {
+        return { applies: false, reason: 'The filter is incomplete or uses an unsupported operator.' };
+      }
+      const resolved = this.resolve(filter, useJSON, scope);
+      return 'reason' in resolved ? { applies: false, reason: resolved.reason } : { applies: true };
+    });
+  }
+
+  // Where the filters of `sql` go, or why they go nowhere.
+  private scopeFor(sql: string, tableQualifiedKeys: boolean): FilterScope | { reason: string } {
+    // Resolve the target table for THIS query. A single AdHocFilter is shared
+    // across panels, so a query-derived target is intentionally not cached back
+    // onto the instance: caching it would let the first panel to render decide
+    // the table for every later panel.
+    const explicitTarget = this._targetTable !== '';
+    const targetTable = this.resolveTargetTable(sql);
+
+    if (targetTable === '') {
+      return { reason: 'The query does not read a single table, so ad hoc filters are not added to it.' };
+    }
+
+    // Only re-check that the target appears in this query for an explicit
+    // tag-source target; a target just parsed from this same query is by
+    // definition present, and the ASCII \b guard would only produce false
+    // negatives for non-ASCII or spaced names. Quoting is stripped first (e.g.
+    // "default"."table" or `default`.`table`) and the name is regex-escaped so a
+    // name with regex metacharacters (e.g. `a[b`) neither throws nor mismatches.
+    if (explicitTarget && !sql.replace(/["`]/g, '').match(new RegExp(`.*\\b${escapeRegExp(targetTable)}\\b.*`, 'gi'))) {
+      return { reason: `The query does not read ${targetTable}, the table ad hoc filters apply to.` };
+    }
+
+    const select = getSelectAliases(sql);
+    return {
+      table: targetTable,
+      tableQualifiedKeys,
+      aliases: select?.table === targetTable ? select.aliases : undefined,
+    };
+  }
+
+  private renderFilters(
+    adHocFilters: AdHocVariableFilter[],
+    useJSON: boolean,
+    scope?: FilterScope,
+    tableQualified = scope?.tableQualifiedKeys ?? true
+  ): string {
+    if (!adHocFilters || adHocFilters.length === 0) {
+      return '';
+    }
+
+    const rendered = adHocFilters
+      .filter((filter: AdHocVariableFilter) => {
+        const valid = isValid(filter);
+        if (!valid) {
+          console.warn('Invalid adhoc filter will be ignored:', filter);
+        }
+        return valid;
+      })
+      .flatMap((filter) => {
+        const resolved = this.resolve(filter, useJSON, scope, tableQualified);
+        return 'expression' in resolved ? [{ filter, expression: resolved.expression }] : [];
+      });
+
+    return rendered
+      .map(({ filter: f, expression }, i) => {
+        const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
+        const condition = i !== rendered.length - 1 ? toCondition(f.condition) : '';
+        const operator = convertOperatorToClickHouseOperator(f.operator);
+        return ` ${expression} ${operator} ${value} ${condition}`;
+      })
+      .join('');
+  }
+
+  // The expression `filter` tests in `scope`, escaped for the filter string, or
+  // why the filter is left out of it. Without a scope every filter applies.
+  private resolve(
+    filter: AdHocVariableFilter,
+    useJSON: boolean,
+    scope?: FilterScope,
+    tableQualified = scope?.tableQualifiedKeys ?? true
+  ): { expression: string } | { reason: string } {
+    if (!scope) {
+      return { expression: escapeKey(filter.key, useJSON, this._mapColumns, tableQualified) };
+    }
+    // A key the query's SELECT defines as an alias, such as `level` for
+    // `SeverityText AS level`, names a column of the query's result rather than
+    // of the table, so the filter tests the aliased expression instead.
+    const alias = scope.aliases?.get(filter.key);
+    if (alias?.rowValue) {
+      return { expression: aliasExpression(alias.expression) };
+    }
+    if (scope.tableQualifiedKeys && !appliesToTable(filter.key, scope.table, this._mapColumns)) {
+      const table = tablePrefix(filter.key, this._mapColumns);
+      return { reason: `The filter is for table ${table}, and the query reads ${scope.table}.` };
+    }
+    const columns = this._tableColumns.get(scope.table);
+    const column = keyColumn(filter.key, this._mapColumns, tableQualified);
+    if (columns && column !== undefined && !hasColumn(columns, column)) {
+      return {
+        reason: alias
+          ? `In the query ${filter.key} is an aggregate or another expression a table filter cannot test, and ${scope.table} has no column ${column}.`
+          : `${scope.table} has no column ${column}.`,
+      };
+    }
+    return { expression: escapeKey(filter.key, useJSON, this._mapColumns, tableQualified) };
   }
 }
 
@@ -266,6 +424,54 @@ function tablePrefix(key: string, mapColumns: ReadonlySet<string>): string | und
   }
   const [first, ...rest] = key.split('.');
   return rest.length > 0 && !mapColumns.has(first) ? first : undefined;
+}
+
+// The column `key` reads once escapeKey renders it: the Map or JSON column for a
+// key into one, otherwise the key without its table prefix, or the whole key when
+// keys are not table-qualified. Undefined when the key is not a plain name, so the
+// caller cannot tell whether a table has it.
+function keyColumn(key: string, mapColumns: ReadonlySet<string>, tableQualified = true): string | undefined {
+  let column: string;
+  const arrayElement = key.match(/^arrayElement\(([^,]*),/);
+  const bracketed = key.match(BRACKET_MAP_ACCESS);
+  const jsonKey = parseJSONAdhocKey(key);
+  const parts = key.split('.');
+  if (arrayElement) {
+    column = arrayElement[1].trim();
+  } else if (bracketed) {
+    column = bracketed[2];
+  } else if (jsonKey) {
+    column = jsonKey.column;
+  } else if (tableQualified && parts.length >= 3 && !mapColumns.has(parts[0]) && mapColumns.has(parts[1])) {
+    column = parts[1];
+  } else if (parts.length >= 2 && mapColumns.has(parts[0])) {
+    column = parts[0];
+  } else {
+    column = tableQualified && parts.length > 1 ? parts.slice(1).join('.') : key;
+  }
+  return column === '' || /[`'"[\]()]/.test(column) ? undefined : column;
+}
+
+// Whether a table with `columns` has `column`: the column itself, a column it
+// reads a part or a JSON path of (`LogAttributes.keys`), or a Nested column
+// under it (`Events.Name` for `Events`).
+function hasColumn(columns: ReadonlySet<string>, column: string): boolean {
+  const parts = column.split('.');
+  for (let i = parts.length; i > 0; i--) {
+    if (columns.has(parts.slice(0, i).join('.'))) {
+      return true;
+    }
+  }
+  return [...columns].some((c) => c.startsWith(`${column}.`));
+}
+
+// An aliased expression as the left side of a filter: escaped for the
+// single-quoted filter string, and in parentheses unless it is a column or a
+// Map value, so the filter's operator cannot bind into it.
+function aliasExpression(expression: string): string {
+  const escaped = expression.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const columnOrMapValue = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(\['(?:[^'\\]|\\.)*'\])?$/;
+  return columnOrMapValue.test(expression) ? escaped : `(${escaped})`;
 }
 
 function escapeKey(

@@ -1,4 +1,4 @@
-import { getFields, getTable, sqlToStatement } from './ast';
+import { getFields, getSelectAliases, getTable, sqlToStatement } from './ast';
 import { toSql } from 'pgsql-ast-parser';
 
 describe('ast', () => {
@@ -221,6 +221,113 @@ describe('ast', () => {
       ['two CTEs that name each other', 'WITH a AS (SELECT * FROM b), b AS (SELECT * FROM a) SELECT * FROM a', 'a'],
     ])('resolves the table for %s', (_label, sql, expected) => {
       expect(getTable(sql)).toBe(expected);
+    });
+  });
+});
+
+describe('getSelectAliases', () => {
+  const aliasesOf = (sql: string) => Object.fromEntries(getSelectAliases(sql)?.aliases ?? []);
+
+  it('maps each alias of the outer SELECT to its expression, with the table it reads', () => {
+    const select = getSelectAliases(
+      "SELECT Timestamp AS timestamp, SeverityText AS level, ServiceName, ResourceAttributes['k8s.pod.name'] AS pod FROM otel.otel_logs WHERE ServiceName = 'cart'"
+    );
+    expect(select?.table).toBe('otel.otel_logs');
+    expect(Object.fromEntries(select?.aliases ?? [])).toEqual({
+      timestamp: { expression: 'Timestamp', rowValue: true },
+      level: { expression: 'SeverityText', rowValue: true },
+      pod: { expression: "ResourceAttributes['k8s.pod.name']", rowValue: true },
+    });
+  });
+
+  it('reads the quoted aliases of a query builder logs query', () => {
+    const select = getSelectAliases(
+      'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level" FROM "otel"."otel_logs" WHERE ( timestamp >= $__fromTime_ms ) ORDER BY timestamp DESC LIMIT 1000'
+    );
+    expect(select?.table).toBe('otel.otel_logs');
+    expect(select?.aliases.get('level')).toEqual({ expression: 'SeverityText', rowValue: true });
+  });
+
+  it.each([
+    ['a function call', 'SELECT lower(SeverityText) AS level FROM t', 'lower(SeverityText)'],
+    [
+      'a cast',
+      'SELECT ResourceAttributes.k8s.pod.name::String AS k8s_pod FROM t',
+      'ResourceAttributes.k8s.pod.name::String',
+    ],
+    ['an expression with spaces', "SELECT if(x = 'a', 'b', 'c') AS v FROM t", "if(x = 'a', 'b', 'c')"],
+    ['a quoted alias', 'SELECT SeverityText AS "level" FROM t', 'SeverityText'],
+    ['the first item after DISTINCT', 'SELECT DISTINCT SeverityText AS level FROM t', 'SeverityText'],
+    ['the first item after DISTINCT ON', 'SELECT DISTINCT ON (a) SeverityText AS level FROM t', 'SeverityText'],
+    [
+      'an expression with an inner AS',
+      'SELECT CAST(SeverityNumber AS String) AS level FROM t',
+      'CAST(SeverityNumber AS String)',
+    ],
+    [
+      'an expression over lines with comments',
+      'SELECT\n  SeverityText -- the level\n  AS level\nFROM t',
+      'SeverityText',
+    ],
+    [
+      'a qualifier naming the FROM alias',
+      'SELECT lower(l.SeverityText) AS level FROM otel.otel_logs AS l',
+      'lower(SeverityText)',
+    ],
+    ['a FROM alias without AS', 'SELECT l.SeverityText AS level FROM otel_logs l', 'SeverityText'],
+  ])('reads %s', (_label, sql, expression) => {
+    expect(aliasesOf(sql).level ?? aliasesOf(sql).k8s_pod ?? aliasesOf(sql).v).toEqual({ expression, rowValue: true });
+  });
+
+  it('reads the aliases of a WITH query that selects from a table', () => {
+    expect(getSelectAliases("WITH 'x' AS c SELECT SeverityText AS level FROM otel_logs")?.aliases.get('level')).toEqual(
+      {
+        expression: 'SeverityText',
+        rowValue: true,
+      }
+    );
+  });
+
+  it.each([
+    ['an aggregate', 'SELECT max(Duration) AS Duration FROM t GROUP BY TraceId'],
+    ['an aggregate with a suffix', 'SELECT countIf(Duration > 1) AS Duration FROM t'],
+    ['an aggregate family member', 'SELECT uniqCombined64(TraceId) AS Duration FROM t'],
+    ['an aggregate with stacked suffixes', 'SELECT avgMergeState(x) AS Duration FROM t'],
+    ['an upper-case aggregate', 'SELECT COUNT(*) AS Duration FROM t'],
+    ['a parametric aggregate', 'SELECT quantileTDigest(0.9)(Duration) AS Duration FROM t'],
+    ['a window function', 'SELECT row_number() OVER (PARTITION BY TraceId) AS Duration FROM t'],
+    ['a subquery', 'SELECT (SELECT 1) AS Duration FROM t'],
+    ['arrayJoin', 'SELECT arrayJoin(Events.Name) AS Duration FROM t'],
+    ['a macro', 'SELECT $__timeInterval(Timestamp) AS Duration FROM t'],
+  ])('marks %s as not a row value', (_label, sql) => {
+    expect(aliasesOf(sql).Duration?.rowValue).toBe(false);
+  });
+
+  it.each([
+    ['countSubstrings', "SELECT countSubstrings(Body, 'x') AS n FROM t"],
+    ['minus', 'SELECT minus(a, b) AS n FROM t'],
+    ['arrayMap', 'SELECT arrayMap(x -> x, arr) AS n FROM t'],
+    ['ifNull', 'SELECT ifNull(a, 0) AS n FROM t'],
+    ['toUInt64OrNull', 'SELECT toUInt64OrNull(a) AS n FROM t'],
+  ])('keeps %s, which only looks like an aggregate, as a row value', (_label, sql) => {
+    expect(aliasesOf(sql).n?.rowValue).toBe(true);
+  });
+
+  it.each([
+    ['a FROM subquery', 'SELECT level FROM (SELECT SeverityText AS level FROM otel_logs)'],
+    ['a CTE', 'WITH logs AS (SELECT * FROM otel_logs) SELECT SeverityText AS level FROM logs'],
+    ['a JOIN', 'SELECT SeverityText AS level FROM otel_logs l JOIN otel_traces t ON l.TraceId = t.TraceId'],
+    ['an ARRAY JOIN', 'SELECT e AS level FROM otel_traces ARRAY JOIN Events.Name AS e'],
+    ['a set operation', 'SELECT SeverityText AS level FROM a UNION ALL SELECT SeverityText AS level FROM b'],
+    ['a table function', "SELECT SeverityText AS level FROM merge('otel', 'logs')"],
+    ['a statement that is not a SELECT', 'SHOW TABLES'],
+  ])('reads no aliases over %s', (_label, sql) => {
+    expect(getSelectAliases(sql)).toBeUndefined();
+  });
+
+  it('skips items without an alias and keeps the first of a repeated alias', () => {
+    expect(aliasesOf('SELECT *, ServiceName, a AS x, b AS x, c + 1 FROM t')).toEqual({
+      x: { expression: 'a', rowValue: true },
     });
   });
 });
