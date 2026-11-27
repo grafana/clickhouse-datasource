@@ -1820,6 +1820,18 @@ describe('ClickHouseDatasource', () => {
       ]);
       expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
+    it('should not split the condition at a comma inside a string literal', async () => {
+      const rawSql = `select stuff from table where $__conditionalAll(name = 'a,b', $name) and other = 1;`;
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'name', current: { value: '$__all' } } as any,
+      ]);
+      expect(val).toEqual(`select stuff from table where 1=1 and other = 1;`);
+    });
+    it('should not close the macro at a parenthesis inside a string literal', async () => {
+      const rawSql = `select stuff from table where $__conditionalAll(name LIKE '%)%' AND x = 'it\\'s,', $name) and other = 1;`;
+      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'name', current: { value: 'val1' } } as any]);
+      expect(val).toEqual(`select stuff from table where name LIKE '%)%' AND x = 'it\\'s,' and other = 1;`);
+    });
   });
 
   describe('fetchPathsForJSONColumns', () => {
