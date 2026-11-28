@@ -443,7 +443,8 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
       queryParts.push('AND');
     }
 
-    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${options.meta!.logMessageLike}%')`);
+    const likeValue = escapeLikeValue(options.meta!.logMessageLike!);
+    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${likeValue}%')`);
   }
 
   const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
@@ -752,6 +753,13 @@ export const JSON_SENTINEL_KEY = '__ch_json__';
 /** Whether getFilters renders the value as the same quoted literal in every value position, with nothing for template interpolation to expand. */
 export const isPlainStringValue = (value: string): boolean => value === value.trim() && !/[$()'"\\]|\[\[/.test(value);
 
+/**
+ * Makes a value safe to sit inside the single-quoted `'%...%'` literal that LIKE filters build.
+ * ClickHouse string literals use backslash escapes, so backslashes are doubled first and then
+ * single quotes are backslash-escaped. The value is searched for as typed.
+ */
+export const escapeLikeValue = (value: string): string => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 const escapeValue = (value: string | number | boolean): string => {
   // Filter values are typed as strings, but JSON-typed attribute columns can
   // carry numeric/boolean values at runtime. Render those unquoted instead of
@@ -988,7 +996,7 @@ export const getFilters = (options: QueryBuilderOptions, flags: { millisecondTim
         filter.operator === FilterOperator.ILike ||
         filter.operator === FilterOperator.NotILike
       ) {
-        filterParts.push(`'%${filter.value || ''}%'`);
+        filterParts.push(`'%${escapeLikeValue(String(filter.value || ''))}%'`);
       } else {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
